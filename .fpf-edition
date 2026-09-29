@@ -1,0 +1,4 @@
+# Pinned FPF edition of this workbench: scripts/setup.sh checks it out into .fpf/.
+# Changing the commit is a deliberate migration: record it in decisions/.
+url=https://github.com/ailev/FPF.git
+commit=d131d30a44e78523e78da9d22aefd83e59f5e4a4
