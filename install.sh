@@ -1,15 +1,15 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # workbench installer. Run it in the root of a target project:
 #
-#   curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh | bash
-#   curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh | bash -s -- \
+#   curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh | sh -s -- \
 #     --repo git@gitlab.com:you/my-workbench.git
 #
 # It puts the owner's private knowledge-base repository into ./.workbench (creating
 # it from the public template when that repository is empty or missing), prepares the
 # pinned FPF edition and connects the workbench to the project without touching the
 # project's history. Re-running it in the same project updates the workbench.
-set -euo pipefail
+set -eu
 
 TEMPLATE="${WORKBENCH_TEMPLATE:-https://github.com/ypolosov/workbench.git}"
 REPO="${WORKBENCH_REPO:-}"
@@ -22,8 +22,8 @@ usage() {
   cat <<'EOF'
 Установка workbench в текущий проект (запускать в корне git-проекта).
 
-  curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh | bash
-  curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh | bash -s -- \
+  curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh | sh
+  curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh | sh -s -- \
     --repo git@gitlab.com:you/my-workbench.git
 
 Параметры (в скобках - переменные окружения):
@@ -49,28 +49,27 @@ die() {
   exit 1
 }
 
-# Answers come from the terminal: under curl | bash, stdin is the script itself.
+# Answers come from the terminal: under curl | sh, stdin is the script itself.
 have_tty() {
   (: </dev/tty) 2>/dev/null
 }
 
+# ask <prompt> [default]: prints the answer read from the terminal.
 ask() {
-  local prompt="$1" default="${2:-}" answer
   have_tty || return 1
-  if [ -n "$default" ]; then
-    printf '%s [%s]: ' "$prompt" "$default" >/dev/tty
+  if [ -n "${2:-}" ]; then
+    printf '%s [%s]: ' "$1" "$2" >/dev/tty
   else
-    printf '%s: ' "$prompt" >/dev/tty
+    printf '%s: ' "$1" >/dev/tty
   fi
-  IFS= read -r answer </dev/tty || return 1
-  printf '%s\n' "${answer:-$default}"
+  IFS= read -r ask_answer </dev/tty || return 1
+  printf '%s\n' "${ask_answer:-${2:-}}"
 }
 
 confirm() {
-  local answer
   [ "$ASSUME_YES" = 1 ] && return 0
-  answer="$(ask "$1 [y/N]" "")" || return 1
-  case "$answer" in
+  confirm_answer="$(ask "$1 [y/N]" "")" || return 1
+  case "$confirm_answer" in
     y | Y | yes | д | Д | да | Да) return 0 ;;
     *) return 1 ;;
   esac
@@ -79,19 +78,36 @@ confirm() {
 parse_args() {
   while [ $# -gt 0 ]; do
     case "$1" in
-      --repo) REPO="${2:?--repo: нужен адрес}"; shift 2 ;;
-      --base) BASE="${2:?--base: нужен адрес}"; shift 2 ;;
-      --name) NAME="${2:?--name: нужно имя}"; shift 2 ;;
-      --template) TEMPLATE="${2:?--template: нужен адрес}"; shift 2 ;;
-      --yes | -y) ASSUME_YES=1; shift ;;
-      -h | --help) usage; exit 0 ;;
+      --repo)
+        REPO="${2:?--repo: нужен адрес}"
+        shift 2
+        ;;
+      --base)
+        BASE="${2:?--base: нужен адрес}"
+        shift 2
+        ;;
+      --name)
+        NAME="${2:?--name: нужно имя}"
+        shift 2
+        ;;
+      --template)
+        TEMPLATE="${2:?--template: нужен адрес}"
+        shift 2
+        ;;
+      --yes | -y)
+        ASSUME_YES=1
+        shift
+        ;;
+      -h | --help)
+        usage
+        exit 0
+        ;;
       *) die "неизвестный параметр: $1 (см. --help)" ;;
     esac
   done
 }
 
 check_environment() {
-  local top
   command -v git >/dev/null || die "нужен git"
   command -v jq >/dev/null || die "нужен jq: https://jqlang.org"
   top="$(git rev-parse --show-toplevel 2>/dev/null)" || die "запусти установщик в корне git-проекта"
@@ -119,13 +135,12 @@ bootstrap() {
   git -C "$DEST" remote add origin "$REPO"
   if ! git -C "$DEST" push -u origin HEAD; then
     die "не удалось отправить в $REPO. Создай там пустое закрытое хранилище и выполни:
-  git -C $DEST push -u origin HEAD && bash $DEST/scripts/setup.sh"
+  git -C $DEST push -u origin HEAD && sh $DEST/scripts/setup.sh"
   fi
 }
 
 # Keeps .workbench out of the project's git from the start, even if setup fails later.
 exclude_dest() {
-  local exclude
   exclude="$(git rev-parse --absolute-git-dir)/info/exclude"
   mkdir -p "$(dirname "$exclude")"
   if ! grep -qxF "/$DEST/" "$exclude" 2>/dev/null; then
@@ -137,16 +152,15 @@ exclude_dest() {
 # "master" that received "main") is cloned without a checkout: pick main or the
 # first branch.
 ensure_checkout() {
-  local branches branch
   git -C "$DEST" rev-parse --verify -q HEAD >/dev/null && return 0
   branches="$(git -C "$DEST" for-each-ref --format='%(refname:lstrip=3)' refs/remotes/origin | grep -vx HEAD || true)"
-  branch="$(printf '%s\n' "$branches" | grep -x main || printf '%s\n' "$branches" | head -1)"
+  branch="$(printf '%s\n' "$branches" | grep -x main || printf '%s\n' "$branches" | head -n 1)"
   [ -n "$branch" ] || die "в $REPO нет веток"
   git -C "$DEST" checkout -q -B "$branch" "origin/$branch"
 }
 
 install_clone() {
-  local rc=0
+  rc=0
   git ls-remote --exit-code --heads "$REPO" >/dev/null 2>&1 || rc=$?
   case "$rc" in
     0)
@@ -178,7 +192,7 @@ main() {
     exclude_dest
     install_clone
   fi
-  bash "$DEST/scripts/setup.sh"
+  sh "$DEST/scripts/setup.sh"
   cat >&2 <<EOF
 
 workbench: готово.

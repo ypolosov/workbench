@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Connects this workbench clone to the project that hosts it as <project>/.workbench.
 # Nothing is committed into the project: every file created there is listed in the
 # project's .git/info/exclude and recorded in a state file inside its git dir.
@@ -7,10 +7,11 @@
 #
 # Usage: attach.sh [<project-dir>]            connect (default: the hosting project)
 #        attach.sh --detach [<project-dir>]   remove exactly what attach created
-set -euo pipefail
+set -eu
 
+WB_DIR="$(cd "$(dirname "$0")/.." && pwd -P)"
 # shellcheck source=paths.sh
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/paths.sh"
+. "$WB_DIR/scripts/paths.sh"
 
 MARK="workbench:attach"
 # Expanded by the shell that runs each hook, not here.
@@ -24,12 +25,12 @@ die() {
 
 # Sets TARGET, STATE and EXCLUDE; the project must host this clone as .workbench.
 use_target() {
-  local dir="$1" git_dir
-  if [ -z "$dir" ]; then
-    dir="$(wb_host_project)" || die "clone workbench into <project>/.workbench first"
+  target_dir="$1"
+  if [ -z "$target_dir" ]; then
+    target_dir="$(wb_host_project)" || die "clone workbench into <project>/.workbench first"
   fi
-  TARGET="$(cd "$dir" 2>/dev/null && pwd -P)" || die "no such directory: $dir"
-  [ "$TARGET/.workbench" -ef "$WB_DIR" ] || die "this clone is not $TARGET/.workbench"
+  TARGET="$(cd "$target_dir" 2>/dev/null && pwd -P)" || die "no such directory: $target_dir"
+  [ "$(cd "$TARGET/.workbench" 2>/dev/null && pwd -P)" = "$WB_DIR" ] || die "this clone is not $TARGET/.workbench"
   git_dir="$(git -C "$TARGET" rev-parse --absolute-git-dir 2>/dev/null)" || die "not a git repository: $TARGET"
   STATE="$git_dir/workbench-attach.state"
   EXCLUDE="$git_dir/info/exclude"
@@ -48,11 +49,11 @@ exclude_clone() {
 }
 
 write_claude_local() {
-  local file="$TARGET/CLAUDE.local.md"
-  if [ -e "$file" ] && ! grep -q "$MARK" "$file"; then
-    die "CLAUDE.local.md exists and was not created by workbench: $file"
+  claude_local="$TARGET/CLAUDE.local.md"
+  if [ -e "$claude_local" ] && ! grep -q "$MARK" "$claude_local"; then
+    die "CLAUDE.local.md exists and was not created by workbench: $claude_local"
   fi
-  cat >"$file" <<EOF
+  cat >"$claude_local" <<EOF
 <!-- $MARK: local file, never commit it. Remove with: .workbench/scripts/attach.sh --detach -->
 # Подключён workbench
 
@@ -60,50 +61,43 @@ write_claude_local() {
 - \$FPF = .workbench/.fpf (закреплённое издание FPF)
 
 @.workbench/AGENTS.md
+
+Личная память владельца (файлы - в .workbench/memory/):
+
+@.workbench/memory/MEMORY.md
 EOF
   record created CLAUDE.local.md
 }
 
 # Hooks of the Claude Code adapter plus the owner's optional overlay.
 settings_json() {
-  local base
-  base="$(jq -n --arg h "$HOOKS" '
-    def cmd(name): {type: "command", command: ("\"" + $h + "/" + name + "\"")};
-    {
-      hooks: {
-        SessionStart: [{hooks: [cmd("session-start.sh")]}],
-        UserPromptSubmit: [{hooks: [cmd("wp-gate-reminder.sh"), cmd("close-gate-reminder.sh")]}],
-        PreToolUse: [{matcher: "Bash", hooks: [cmd("destructive-guard.sh")]}]
-      }
-    }')"
-  wb_with_overlay "$base"
+  wb_with_overlay "$(wb_hooks_json "$HOOKS")"
 }
 
 # Creates .claude/settings.local.json, or merges into an existing one after a backup.
 write_settings() {
-  local file="$TARGET/.claude/settings.local.json" ours
+  settings_file="$TARGET/.claude/settings.local.json"
   if [ ! -d "$TARGET/.claude" ]; then
     mkdir "$TARGET/.claude"
     record created-dir .claude
   fi
   ours="$(settings_json)"
-  if [ -f "$file" ]; then
-    cp "$file" "$file.wb-backup"
+  if [ -f "$settings_file" ]; then
+    cp "$settings_file" "$settings_file.wb-backup"
     record backup .claude/settings.local.json
     # Merge into a temporary file: the project's own file changes only on success.
-    if ! printf '%s' "$ours" | jq -s "$MERGE_JQ" "$file.wb-backup" - >"$file.wb-tmp"; then
-      rm -f "$file.wb-tmp"
-      die "cannot merge into $file (left unchanged; run --detach to clean up)"
+    if ! printf '%s' "$ours" | jq -s "$MERGE_JQ" "$settings_file.wb-backup" - >"$settings_file.wb-tmp"; then
+      rm -f "$settings_file.wb-tmp"
+      die "cannot merge into $settings_file (left unchanged; run --detach to clean up)"
     fi
-    mv "$file.wb-tmp" "$file"
+    mv "$settings_file.wb-tmp" "$settings_file"
   else
-    printf '%s\n' "$ours" >"$file"
+    printf '%s\n' "$ours" >"$settings_file"
     record created .claude/settings.local.json
   fi
 }
 
 link_skills() {
-  local skill name link
   if [ ! -d "$TARGET/.claude/skills" ]; then
     mkdir "$TARGET/.claude/skills"
     record created-dir .claude/skills
@@ -123,7 +117,7 @@ link_skills() {
 write_exclude() {
   {
     echo "# $MARK begin"
-    sed -n 's/^\(created\|created-dir\|backup\) //p' "$STATE" | sed 's#^#/#'
+    grep -E '^(created|created-dir|backup) ' "$STATE" | sed 's#^[^ ]* #/#'
     if grep -q '^backup ' "$STATE"; then echo "/.claude/settings.local.json.wb-backup"; fi
     echo "# $MARK end"
   } >>"$EXCLUDE"
@@ -142,7 +136,6 @@ attach() {
 
 detach() {
   [ -f "$STATE" ] || die "workbench is not attached to $TARGET"
-  local kind rel
   # Undo in reverse order: files and links first, then the directories that held them.
   awk '{ lines[NR] = $0 } END { for (i = NR; i > 0; i--) print lines[i] }' "$STATE" |
     while read -r kind rel; do

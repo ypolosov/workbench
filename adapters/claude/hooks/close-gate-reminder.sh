@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Close gate reminder (UserPromptSubmit). Adapted from FMT-exocortex-template
 # .claude/hooks/close-gate-reminder.sh (MIT, Tseren Tserenov): points to the
 # close-session skill of this project instead of /run-protocol.

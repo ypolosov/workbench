@@ -1,0 +1,19 @@
+# Tests (bats), linting (shellcheck) and formatting (shfmt) on every change: make check.
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    # Private copies of the template (personal knowledge bases) skip the run.
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq bats shellcheck shfmt
+      - name: make check
+        run: make check

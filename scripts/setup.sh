@@ -1,11 +1,12 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Initializes this workbench clone: pinned FPF worktree in .fpf, git hooks and
 # local settings; then connects the host project when the clone lives in
 # <project>/.workbench. Idempotent: safe to re-run.
-set -euo pipefail
+set -eu
 
+WB_DIR="$(cd "$(dirname "$0")/.." && pwd -P)"
 # shellcheck source=paths.sh
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/paths.sh"
+. "$WB_DIR/scripts/paths.sh"
 
 fpf_url="$(wb_fpf_edition url)"
 fpf_commit="$(wb_fpf_edition commit)"
@@ -39,9 +40,18 @@ git -C "$WB_DIR" config core.hooksPath .githooks
 chmod +x "$WB_DIR"/adapters/claude/hooks/*.sh "$WB_DIR"/.githooks/* "$WB_DIR"/scripts/*.sh
 
 # 3. Sessions opened in the workbench itself keep Claude Code auto-memory here and get
-#    the personal overlay. autoMemoryDirectory is ignored in the committed settings.json.
+#    the personal overlay; a clone opened on its own also gets the adapter's hooks.
+#    All of it is local: autoMemoryDirectory is ignored in a committed settings.json.
+host="$(wb_host_project)" || host=""
+mkdir -p "$WB_DIR/.claude"
 local_settings="$WB_DIR/.claude/settings.local.json"
 settings="$(jq -n --arg dir "$WB_DIR/memory" '{autoMemoryDirectory: $dir}')"
+if [ -z "$host" ]; then
+  # Expanded by the shell that runs each hook, not here.
+  # shellcheck disable=SC2016
+  hooks="$(wb_hooks_json '$CLAUDE_PROJECT_DIR/adapters/claude/hooks')"
+  settings="$(printf '%s\n%s\n' "$settings" "$hooks" | jq -s "$MERGE_JQ")"
+fi
 if [ -f "$local_settings" ]; then
   settings="$(printf '%s' "$settings" | jq -s "$MERGE_JQ" "$local_settings" -)"
 fi
@@ -54,7 +64,11 @@ markers="$(git -C "$WB_DIR" rev-parse --absolute-git-dir)/info/company-markers"
 
 echo "workbench ready: $WB_DIR, FPF $(git -C "$FPF_DIR" rev-parse --short HEAD)"
 
-# 5. A clone living in <project>/.workbench is connected to that project.
-if project="$(wb_host_project)"; then
-  "$WB_DIR/scripts/attach.sh" "$project"
+# 5. A clone living in <project>/.workbench is connected to that project; a clone opened
+#    on its own gets its instructions and skills through local files its git ignores.
+if [ -n "$host" ]; then
+  "$WB_DIR/scripts/attach.sh" "$host"
+else
+  printf '<!-- workbench: local file made by scripts/setup.sh, never commit it. -->\n@AGENTS.md\n' >"$WB_DIR/CLAUDE.local.md"
+  [ -e "$WB_DIR/.claude/skills" ] || ln -s ../.agents/skills "$WB_DIR/.claude/skills"
 fi

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Blocks commits that carry company markers or obvious secrets into the personal core.
 # Markers live in .git/info/company-markers (local, untracked), one word or regex per line.
 set -u
@@ -15,7 +15,7 @@ if [ -f "$markers" ]; then
       echo "pre-commit: company marker found in staged changes: $m" >&2
       fail=1
     fi
-  done < "$markers"
+  done <"$markers"
 else
   echo "pre-commit: no marker list at $markers - company check skipped" >&2
 fi
@@ -26,5 +26,8 @@ if printf '%s\n' "$added" | grep -qE -- "$secret_re"; then
   fail=1
 fi
 
-[ "$fail" = 0 ] || { echo "pre-commit: commit blocked (personal core must not hold company data or secrets)" >&2; exit 1; }
+[ "$fail" = 0 ] || {
+  echo "pre-commit: commit blocked (personal core must not hold company data or secrets)" >&2
+  exit 1
+}
 exit 0

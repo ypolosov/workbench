@@ -1,4 +1,6 @@
 # Pinned FPF edition: a git worktree created by scripts/setup.sh.
 /.fpf/
-# Local Claude Code settings (auto-memory location).
+# Local Claude Code files made by scripts/setup.sh for a clone opened on its own.
 /.claude/settings.local.json
+/.claude/skills
+/CLAUDE.local.md

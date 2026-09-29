@@ -8,17 +8,17 @@
 
 В корне своего проекта (это должен быть git-проект):
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh | bash
+```sh
+curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh | sh
 ```
 
 Установщик спросит адрес закрытого хранилища для личной базы. Можно указать его сразу:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh | bash -s -- \
+```sh
+curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh | sh -s -- \
   --repo git@gitlab.com:you/my-workbench.git
 # или из пространства и имени (по умолчанию имя my-workbench):
-curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh | sh -s -- \
   --base git@gitlab.com:you --name my-workbench
 ```
 
@@ -29,7 +29,7 @@ curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh 
 3. Готовится закреплённое издание FPF (`.workbench/.fpf`, издание - в `.fpf-edition`).
 4. workbench подключается к проекту только локальными файлами, прописанными в `.git/info/exclude` проекта: `CLAUDE.local.md`, `.claude/settings.local.json`, ссылки на скиллы в `.claude/skills/`. Существующие локальные настройки дополняются, копия сохраняется.
 
-Все параметры: `curl -fsSL .../install.sh | bash -s -- --help`. Нужны `git`, `bash`, `jq`; для переходника - [Claude Code](https://claude.com/claude-code).
+Все параметры: `curl -fsSL .../install.sh | sh -s -- --help`. Нужны `git`, `sh`, `jq`; для переходника - [Claude Code](https://claude.com/claude-code).
 
 ## Раскладка
 
@@ -41,15 +41,15 @@ curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh 
 
 | Часть | Где |
 |---|---|
-| Инструкции для любых агентов | `AGENTS.md` (Claude Code читает его через `CLAUDE.md`) |
+| Инструкции для любых агентов | `AGENTS.md` (Claude Code получает его через локальный `CLAUDE.local.md`) |
 | Практика работы и её основания в FPF | `lpf/README.md` |
 | Реестр РП, карточки, заметки, решения | `docs/WP-REGISTRY.md`, `inbox/`, `decisions/` |
-| Личная память | `memory/` |
+| Личная память | `memory/` (видна агенту во всех проектах) |
 | Скиллы в общем для агентов формате | `.agents/skills/` (`vdv`, `wp-new`, `close-session`) |
 | Переходник для Claude Code | `adapters/claude/hooks/` |
 | Проверки для любого агента и человека | `.githooks/`: маркеры компании и секреты при сохранении, запрет перезаписи истории |
 | Подготовка и подключение | `scripts/setup.sh`, `scripts/attach.sh` |
-| Проверка установки | `tests/smoke.sh` |
+| Тесты и проверка стиля | `tests/` (bats), `Makefile` |
 
 ## Работа
 
@@ -57,23 +57,28 @@ curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh 
 - Любая задача сначала связывается с РП: принять, отложить, отклонить или вернуть (OPS.5 из FPF).
 - «закрывай» → карточка РП обновлена и сохранена в личной базе; в проекте ничего не сохраняется без команды.
 - Отправка личной базы в удалённое хранилище - по команде владельца, после этого изменения видят клоны в других проектах (`git -C .workbench pull`).
+- Личную базу можно открыть и отдельно, например для планирования: в её клоне `sh scripts/setup.sh`, затем `claude` в её корне.
+- Сам workbench разрабатывается так же: установи workbench в рабочую копию шаблона, как в любой проект. Агент работает по твоей личной базе, а шаблон для него - обычный код.
 
 ## Обновление и удаление
 
 - Обновить личную базу: `git -C .workbench pull` или ещё раз запустить установщик в проекте.
 - Подтянуть обновления шаблона: `git -C .workbench pull template main`.
-- Отключить от проекта: `bash .workbench/scripts/attach.sh --detach`; сама папка `.workbench` остаётся, её можно удалить вручную.
+- Отключить от проекта: `sh .workbench/scripts/attach.sh --detach`; сама папка `.workbench` остаётся, её можно удалить вручную.
 
-## Проверка
+## Разработка
 
-`bash tests/smoke.sh` прогоняет установку от начала до конца во временной папке: без сети и без твоих хранилищ. Закрытое хранилище заменяет локальное, FPF - маленькая локальная копия, шаблон - текущая рабочая копия вместе с несохранёнными правками. Проверяется:
+Код - только POSIX sh (`#!/bin/sh`). Изменения - через тесты: сначала падающий тест на [bats](https://github.com/bats-core/bats-core), потом код. Команды собраны в `Makefile`:
 
-- установка в новый проект и во второй проект с уже существующей личной базой, обновление повторным запуском;
-- git проекта ничего не видит, а отключение возвращает проект в прежнее состояние;
-- издание FPF: одна ревизия, запертая рабочая копия, перенос папки проекта;
-- хуки Claude Code в том виде, в каком их запускает Claude Code, и проверки перед сохранением в личной базе.
+| Команда | Что делает |
+|---|---|
+| `make check` | проверка стиля, форматирования и все тесты; то же запускается на GitHub при каждом изменении |
+| `make test` | тесты `tests/*.bats` |
+| `make lint` | проверка стиля shellcheck, для скриптов - в режиме POSIX sh |
+| `make format-check` | проверка форматирования shfmt, правила - в `.editorconfig` |
+| `make format` | форматирует скрипты и тесты |
 
-`KEEP=1 bash tests/smoke.sh` оставляет временную папку для разбора. На GitHub тот же прогон запускается при каждом изменении шаблона; в закрытых копиях он пропускается.
+Тесты не трогают сеть и твои хранилища. Каждый файл тестов собирает песочницу во временной папке: закрытое хранилище заменяет локальное, FPF - маленькая локальная копия, шаблон - текущая рабочая копия вместе с несохранёнными правками. Проверяются установка в новый и во второй проект, отключение, издание FPF, перенос папки проекта, личная база отдельно и в разработке шаблона, хуки Claude Code, защита от опасных команд и проверки перед сохранением. Нужны `bats`, `shellcheck` и `shfmt`. В закрытых копиях шаблона прогон на GitHub пропускается.
 
 ## Личные настройки
 
@@ -93,12 +98,12 @@ curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh 
 
 Install in the root of a git project:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh | bash -s -- \
+```sh
+curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh | sh -s -- \
   --repo git@gitlab.com:you/my-workbench.git
 ```
 
-An empty or missing private repository is created from this template (GitLab creates a private project on first push; on GitHub create an empty private repository first). The installer prepares the pinned FPF edition and connects the workbench to the project with local, git-excluded files only. The content (agent instructions, practice, skills) is in Russian; a Claude Code adapter is included, other agents read `AGENTS.md`. `bash tests/smoke.sh` runs an offline end-to-end check of the installer in a temporary directory.
+An empty or missing private repository is created from this template (GitLab creates a private project on first push; on GitHub create an empty private repository first). The installer prepares the pinned FPF edition and connects the workbench to the project with local, git-excluded files only. The content (agent instructions, practice, skills) is in Russian; a Claude Code adapter is included, other agents read `AGENTS.md`. The code is POSIX sh; `make check` runs the offline bats tests, shellcheck and shfmt.
 
 ## Лицензия
 

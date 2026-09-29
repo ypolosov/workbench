@@ -1,0 +1,3 @@
+# Follow sourced files (scripts/paths.sh) relative to the sourcing script.
+external-sources=true
+source-path=SCRIPTDIR

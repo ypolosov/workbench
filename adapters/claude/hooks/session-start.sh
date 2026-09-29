@@ -1,12 +1,13 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # SessionStart hook (Claude Code adapter): puts the date, workbench and FPF
 # locations, the workbench sync state, a warning about locally changed
 # executable parts and the active work products into the session context.
 # Read-only; never fails the session.
 set -u
 
+WB_DIR="$(cd "$(dirname "$0")/../../.." && pwd -P)"
 # shellcheck source=../../../scripts/paths.sh
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)/scripts/paths.sh"
+. "$WB_DIR/scripts/paths.sh"
 
 input="$(cat 2>/dev/null || true)"
 cwd="$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null)"
@@ -14,13 +15,13 @@ cwd="${cwd:-${CLAUDE_PROJECT_DIR:-$PWD}}"
 
 pinned="$(wb_fpf_edition commit)"
 if fpf_rev="$(git -C "$FPF_DIR" rev-parse HEAD 2>/dev/null)"; then
-  fpf_line="\$FPF = ${FPF_DIR} (издание ${fpf_rev:0:7})"
-  [ "$fpf_rev" = "$pinned" ] || fpf_line="${fpf_line}; ВНИМАНИЕ: закреплено издание ${pinned:0:7}"
+  fpf_line="\$FPF = ${FPF_DIR} (издание $(printf '%.7s' "$fpf_rev"))"
+  [ "$fpf_rev" = "$pinned" ] || fpf_line="${fpf_line}; ВНИМАНИЕ: закреплено издание $(printf '%.7s' "$pinned")"
 else
   fpf_line="\$FPF не подготовлен: запусти ${WB_DIR}/scripts/setup.sh"
 fi
 
-sync_state="$(git -C "$WB_DIR" status -sb 2>/dev/null | head -1)"
+sync_state="$(git -C "$WB_DIR" status -sb 2>/dev/null | head -n 1)"
 # Hooks, scripts and skills run in every session: local edits nobody saved may be tampering.
 changed="$(git -C "$WB_DIR" status --porcelain -- adapters scripts .githooks .agents 2>/dev/null | tr '\n' ' ')"
 if [ -n "$changed" ]; then
