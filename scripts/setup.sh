@@ -12,9 +12,16 @@ fpf_commit="$(wb_fpf_edition commit)"
 
 # 1. FPF is a second remote of this repository; the pinned edition is a locked worktree.
 git -C "$WB_DIR" remote get-url fpf >/dev/null 2>&1 || git -C "$WB_DIR" remote add fpf "$fpf_url"
-git -C "$WB_DIR" cat-file -e "$fpf_commit^{commit}" 2>/dev/null || git -C "$WB_DIR" fetch --no-tags fpf
+if ! git -C "$WB_DIR" cat-file -e "$fpf_commit^{commit}" 2>/dev/null; then
+  # Only the pinned snapshot is needed: fetching that one commit is several times
+  # smaller than the whole FPF history. Servers that refuse fetch-by-commit get a full fetch.
+  if ! git -C "$WB_DIR" fetch -q --depth 1 --no-tags fpf "$fpf_commit"; then
+    echo "note: fetching the full FPF history instead" >&2
+    git -C "$WB_DIR" fetch -q --no-tags fpf
+  fi
+fi
 if [ ! -e "$FPF_DIR/.git" ]; then
-  git -C "$WB_DIR" worktree add --detach "$FPF_DIR" "$fpf_commit"
+  git -C "$WB_DIR" worktree add -q --detach "$FPF_DIR" "$fpf_commit"
   git -C "$WB_DIR" worktree lock --reason "pinned FPF edition, see .fpf-edition" "$FPF_DIR"
 fi
 # After a move the repository's record of the worktree is stale: repair it, then keep

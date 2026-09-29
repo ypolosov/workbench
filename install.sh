@@ -115,7 +115,7 @@ resolve_repo() {
 # its updates merge with: git -C .workbench pull template main
 bootstrap() {
   say "создаю личную базу из шаблона $TEMPLATE"
-  git clone --origin template "$TEMPLATE" "$DEST"
+  git clone -q --origin template "$TEMPLATE" "$DEST"
   git -C "$DEST" remote add origin "$REPO"
   if ! git -C "$DEST" push -u origin HEAD; then
     die "не удалось отправить в $REPO. Создай там пустое закрытое хранилище и выполни:
@@ -151,7 +151,7 @@ install_clone() {
   case "$rc" in
     0)
       say "клонирую личную базу $REPO"
-      git clone "$REPO" "$DEST"
+      git clone -q "$REPO" "$DEST"
       ensure_checkout
       git -C "$DEST" remote get-url template >/dev/null 2>&1 || git -C "$DEST" remote add template "$TEMPLATE"
       ;;
