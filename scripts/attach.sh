@@ -48,13 +48,9 @@ exclude_clone() {
   fi
 }
 
-write_claude_local() {
-  claude_local="$TARGET/CLAUDE.local.md"
-  if [ -e "$claude_local" ] && ! grep -q "$MARK" "$claude_local"; then
-    die "CLAUDE.local.md exists and was not created by workbench: $claude_local"
-  fi
-  cat >"$claude_local" <<EOF
-<!-- $MARK: local file, never commit it. Remove with: .workbench/scripts/attach.sh --detach -->
+claude_block() {
+  cat <<EOF
+<!-- $MARK begin: local lines, never commit them. Remove with: .workbench/scripts/attach.sh --detach -->
 # Подключён workbench
 
 - \$WORKBENCH = .workbench (клон личного workbench)
@@ -65,8 +61,51 @@ write_claude_local() {
 Личная память владельца (файлы - в .workbench/memory/):
 
 @.workbench/memory/MEMORY.md
+<!-- $MARK end -->
 EOF
-  record created CLAUDE.local.md
+}
+
+# strip_block <file>: removes the workbench block and the empty line written before it,
+# so the owner's own text stays exactly as it was.
+strip_block() {
+  awk -v begin="<!-- $MARK begin" -v end="<!-- $MARK end -->" '
+    skip {
+      if ($0 == end) skip = 0
+      next
+    }
+    index($0, begin) == 1 {
+      skip = 1
+      held = 0
+      next
+    }
+    held {
+      print ""
+      held = 0
+    }
+    $0 == "" {
+      held = 1
+      next
+    }
+    { print }
+    END { if (held) print "" }
+  ' "$1" >"$1.wb-tmp"
+  mv "$1.wb-tmp" "$1"
+}
+
+# The project's own CLAUDE.local.md stays: the workbench lines go into a marked block
+# at its end. Without one, the file is created.
+write_claude_local() {
+  claude_local="$TARGET/CLAUDE.local.md"
+  if [ -e "$claude_local" ]; then
+    {
+      echo
+      claude_block
+    } >>"$claude_local"
+    record block CLAUDE.local.md
+  else
+    claude_block >"$claude_local"
+    record created CLAUDE.local.md
+  fi
 }
 
 # Hooks of the Claude Code adapter plus the owner's optional overlay.
@@ -141,6 +180,7 @@ detach() {
     while read -r kind rel; do
       case "$kind" in
         created) rm -f "${TARGET:?}/$rel" ;;
+        block) strip_block "$TARGET/$rel" ;;
         backup) mv -f "$TARGET/$rel.wb-backup" "$TARGET/$rel" ;;
         created-dir) rmdir "$TARGET/$rel" 2>/dev/null || echo "attach: kept non-empty $rel" >&2 ;;
       esac

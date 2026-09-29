@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
-# First installation into a project whose private repository is still empty; then
-# re-running the setup, detaching and attaching again. Tests run in file order.
+# First installation into a project whose private repository is still empty and which
+# already has its own local Claude Code files; then re-running the setup, detaching and
+# attaching again. Tests run in file order.
 
 bats_require_minimum_version 1.5.0
 load helpers
@@ -13,6 +14,11 @@ setup_file() {
   mkdir "$P1/.claude"
   printf '{"permissions": {"allow": ["Bash(ls:*)"]}}\n' >"$P1/.claude/settings.local.json"
   cp "$P1/.claude/settings.local.json" "$SANDBOX/settings.orig"
+  # The owner's own local instructions for this project, ignored by its git.
+  printf 'CLAUDE.local.md\n' >>"$P1/.gitignore"
+  git -C "$P1" commit -qam "ignore local instructions"
+  printf '# Мои заметки по проекту\n\nЛичные правила для этого проекта.\n' >"$P1/CLAUDE.local.md"
+  cp "$P1/CLAUDE.local.md" "$SANDBOX/claude-local.orig"
   cp "$P1/.git/info/exclude" "$SANDBOX/exclude.orig"
   project_files "$P1" >"$SANDBOX/files.orig"
   install_into "$P1" --repo "$PRIVATE"
@@ -54,6 +60,11 @@ setup_file() {
   [ "$(git -C "$WB1" config core.hooksPath)" = .githooks ]
 }
 
+@test "свой CLAUDE.local.md проекта сохранён, workbench дописал к нему свой блок" {
+  head -n 3 "$P1/CLAUDE.local.md" | cmp - "$SANDBOX/claude-local.orig"
+  grep -q '^<!-- workbench:attach begin' "$P1/CLAUDE.local.md"
+}
+
 @test "CLAUDE.local.md подключает инструкции workbench" {
   grep -qxF @.workbench/AGENTS.md "$P1/CLAUDE.local.md"
 }
@@ -80,6 +91,7 @@ setup_file() {
 @test "повторный setup.sh не задваивает подключение" {
   sh "$WB1/scripts/setup.sh"
   [ "$(grep -c '^# workbench:attach begin$' "$P1/.git/info/exclude")" = 1 ]
+  [ "$(grep -c '^@.workbench/AGENTS.md$' "$P1/CLAUDE.local.md")" = 1 ]
   cmp "$P1/.claude/settings.local.json.wb-backup" "$SANDBOX/settings.orig"
 }
 
@@ -87,6 +99,7 @@ setup_file() {
   sh "$WB1/scripts/attach.sh" --detach "$P1"
   [ "$(project_files "$P1")" = "$(cat "$SANDBOX/files.orig")" ]
   cmp "$P1/.claude/settings.local.json" "$SANDBOX/settings.orig"
+  cmp "$P1/CLAUDE.local.md" "$SANDBOX/claude-local.orig"
   exclude_restored "$P1" "$SANDBOX/exclude.orig"
   [ -z "$(git -C "$P1" status --porcelain)" ]
 }

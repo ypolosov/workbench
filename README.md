@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh 
 1. Хранилище уже есть и не пустое → клонируется в `.workbench`.
 2. Хранилище пустое или его нет → создаётся из этого шаблона и отправляется туда. GitLab создаёт закрытый проект прямо при первой отправке; на GitHub сначала создай пустое закрытое хранилище.
 3. Готовится закреплённое издание FPF (`.workbench/.fpf`, издание - в `.fpf-edition`).
-4. workbench подключается к проекту только локальными файлами, прописанными в `.git/info/exclude` проекта: `CLAUDE.local.md`, `.claude/settings.local.json`, ссылки на скиллы в `.claude/skills/`. Существующие локальные настройки дополняются, копия сохраняется.
+4. workbench подключается к проекту только локальными файлами, прописанными в `.git/info/exclude` проекта: `CLAUDE.local.md`, `.claude/settings.local.json`, ссылки на скиллы в `.claude/skills/`. Существующие локальные настройки дополняются, копия сохраняется. Если у проекта уже есть свой `CLAUDE.local.md`, workbench дописывает в его конец отмеченный блок и при отключении убирает его.
 
 Все параметры: `curl -fsSL .../install.sh | sh -s -- --help`. Нужны `git`, `sh`, `jq`; для переходника - [Claude Code](https://claude.com/claude-code).
 
