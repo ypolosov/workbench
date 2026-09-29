@@ -1,0 +1,17 @@
+# Offline smoke test of the installer (tests/smoke.sh) on every change.
+name: smoke
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  smoke:
+    # Private copies of the template (personal knowledge bases) skip the run.
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Smoke test
+        run: bash tests/smoke.sh

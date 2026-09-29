@@ -49,6 +49,7 @@ curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh 
 | Переходник для Claude Code | `adapters/claude/hooks/` |
 | Проверки для любого агента и человека | `.githooks/`: маркеры компании и секреты при сохранении, запрет перезаписи истории |
 | Подготовка и подключение | `scripts/setup.sh`, `scripts/attach.sh` |
+| Проверка установки | `tests/smoke.sh` |
 
 ## Работа
 
@@ -62,6 +63,17 @@ curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh 
 - Обновить личную базу: `git -C .workbench pull` или ещё раз запустить установщик в проекте.
 - Подтянуть обновления шаблона: `git -C .workbench pull template main`.
 - Отключить от проекта: `bash .workbench/scripts/attach.sh --detach`; сама папка `.workbench` остаётся, её можно удалить вручную.
+
+## Проверка
+
+`bash tests/smoke.sh` прогоняет установку от начала до конца во временной папке: без сети и без твоих хранилищ. Закрытое хранилище заменяет локальное, FPF - маленькая локальная копия, шаблон - текущая рабочая копия вместе с несохранёнными правками. Проверяется:
+
+- установка в новый проект и во второй проект с уже существующей личной базой, обновление повторным запуском;
+- git проекта ничего не видит, а отключение возвращает проект в прежнее состояние;
+- издание FPF: одна ревизия, запертая рабочая копия, перенос папки проекта;
+- хуки Claude Code в том виде, в каком их запускает Claude Code, и проверки перед сохранением в личной базе.
+
+`KEEP=1 bash tests/smoke.sh` оставляет временную папку для разбора. На GitHub тот же прогон запускается при каждом изменении шаблона; в закрытых копиях он пропускается.
 
 ## Личные настройки
 
@@ -86,7 +98,7 @@ curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh 
   --repo git@gitlab.com:you/my-workbench.git
 ```
 
-An empty or missing private repository is created from this template (GitLab creates a private project on first push; on GitHub create an empty private repository first). The installer prepares the pinned FPF edition and connects the workbench to the project with local, git-excluded files only. The content (agent instructions, practice, skills) is in Russian; a Claude Code adapter is included, other agents read `AGENTS.md`.
+An empty or missing private repository is created from this template (GitLab creates a private project on first push; on GitHub create an empty private repository first). The installer prepares the pinned FPF edition and connects the workbench to the project with local, git-excluded files only. The content (agent instructions, practice, skills) is in Russian; a Claude Code adapter is included, other agents read `AGENTS.md`. `bash tests/smoke.sh` runs an offline end-to-end check of the installer in a temporary directory.
 
 ## Лицензия
 
