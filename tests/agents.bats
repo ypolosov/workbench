@@ -29,6 +29,14 @@ setup_file() {
   wb "$P1" attach
 }
 
+# names_base_file <file> <path in the base>: the file names that file of the base, the way
+# the agents of this system read paths (C:/... on Windows, where Git Bash says /c/...).
+names_base_file() {
+  local named
+  named="$(grep -oE "[^ ]*/$2" "$1" | head -n 1)"
+  [ -n "$named" ] && cmp -s "$named" "$BASE/$2"
+}
+
 # codex_context <folder>: the context the session-start hook gives Codex started there.
 codex_context() {
   local out
@@ -61,8 +69,8 @@ codex_context() {
 @test "Cursor получает правило workbench: всегда в силе и ведёт к инструкциям и памяти базы" {
   rule="$P1/.cursor/rules/workbench.mdc"
   grep -qx 'alwaysApply: true' "$rule"
-  grep -qF "$BASE/AGENTS.md" "$rule"
-  grep -qF "$BASE/memory/MEMORY.md" "$rule"
+  names_base_file "$rule" AGENTS.md
+  names_base_file "$rule" memory/MEMORY.md
 }
 
 @test "Cursor выполняет хуки из настроек Claude Code: начало сессии говорит с Cursor" {
@@ -95,8 +103,8 @@ codex_context() {
   wb "$SANDBOX" attach --user
   head -n 3 "$CODEX_MD" | cmp - "$SANDBOX/codex-md.orig"
   [ "$(grep -c '^<!-- workbench:user begin' "$CODEX_MD")" = 1 ]
-  grep -qF "$BASE/AGENTS.md" "$CODEX_MD"
-  grep -qF "$BASE/memory/MEMORY.md" "$CODEX_MD"
+  names_base_file "$CODEX_MD" AGENTS.md
+  names_base_file "$CODEX_MD" memory/MEMORY.md
   ctx="$(codex_context "$P1")"
   [[ $ctx == *"прочитай оба файла"* ]]
   [[ $ctx != *"workbench attach --user"* ]]
