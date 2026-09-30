@@ -7,9 +7,10 @@ load helpers
 
 setup_file() {
   make_sandbox
-  export DEV="$SANDBOX/workbench"
+  export BASE="$SANDBOX/my-workbench" DEV="$SANDBOX/workbench"
+  bootstrap "$BASE" --repo "$PRIVATE"
   git clone -q "$TPL" "$DEV"
-  install_into "$DEV" --repo "$PRIVATE"
+  wb "$DEV" attach
 }
 
 @test "у рабочей копии шаблона нет своих инструкций и хуков Claude Code, только из личной базы" {
@@ -20,13 +21,13 @@ setup_file() {
 
 @test "начало сессии в рабочей копии шаблона указывает на личную базу" {
   ctx="$(session_context "$DEV")"
-  [[ $ctx == *"\$WORKBENCH = $DEV/.workbench"* ]]
+  [[ $ctx == *"\$WORKBENCH = $BASE"* ]]
 }
 
 @test "скиллы в рабочей копии шаблона берутся из личной базы" {
-  for skill in "$DEV"/.workbench/.agents/skills/*/; do
+  for skill in "$BASE"/.agents/skills/*/; do
     name="$(basename "$skill")"
-    [ "$(cd "$DEV/.claude/skills/$name" && pwd -P)" = "$DEV/.workbench/.agents/skills/$name" ]
+    [ "$(cd "$DEV/.claude/skills/$name" && pwd -P)" = "$BASE/.agents/skills/$name" ]
   done
 }
 

@@ -18,6 +18,12 @@ indent_size = 2
 shell_variant = posix
 switch_case_indent = true
 
+[bin/*]
+indent_style = space
+indent_size = 2
+shell_variant = posix
+switch_case_indent = true
+
 [*.bats]
 indent_style = space
 indent_size = 2

@@ -8,8 +8,7 @@ load helpers
 setup_file() {
   make_sandbox
   export BASE="$SANDBOX/my-workbench"
-  git clone -q "$TPL" "$BASE"
-  sh "$BASE/scripts/setup.sh"
+  bootstrap "$BASE" --repo "$PRIVATE"
 }
 
 @test "CLAUDE.local.md подключает инструкции самой базы" {

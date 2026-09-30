@@ -75,11 +75,19 @@ new_project() {
 
 # --- actions ----------------------------------------------------------------------
 
-# install_into <project> [args...]: runs install.sh the way `curl ... | sh -s -- args` does.
-install_into() {
-  local project="$1"
+# bootstrap <base dir> [args...]: runs install.sh the way `curl ... | sh -s -- args` does,
+# with the workbench command installed into the sandbox.
+bootstrap() {
+  local dir="$1"
   shift
-  (cd "$project" && sh -s -- --template "$TPL" "$@" <"$TPL/install.sh")
+  (cd "$SANDBOX" && sh -s -- --template "$TPL" --dir "$dir" --bin-dir "$SANDBOX/bin" "$@" <"$TPL/install.sh")
+}
+
+# wb <dir> <command...>: the installed workbench command, run in the given folder.
+wb() {
+  local dir="$1"
+  shift
+  (cd "$dir" && "$SANDBOX/bin/workbench" "$@")
 }
 
 # hook <project> <script> <json>: runs a hook command from the project's generated

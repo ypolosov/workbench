@@ -1,0 +1,2 @@
+# Scripts must keep LF line endings on every platform, Windows included: sh cannot run CRLF.
+* text=auto eol=lf

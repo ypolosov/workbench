@@ -2,7 +2,7 @@
 # Needs bats, shellcheck and shfmt; formatting rules live in .editorconfig.
 .POSIX:
 
-SH_FILES = install.sh scripts/*.sh adapters/claude/hooks/*.sh .githooks/*
+SH_FILES = install.sh bin/* scripts/*.sh adapters/claude/hooks/*.sh .githooks/*
 TEST_FILES = tests/*.bats tests/helpers.bash
 
 check: lint format-check test

@@ -1,12 +1,13 @@
 #!/bin/sh
-# Connects this workbench clone to the project that hosts it as <project>/.workbench.
-# Nothing is committed into the project: every file created there is listed in the
-# project's .git/info/exclude and recorded in a state file inside its git dir.
-# Links and settings use paths relative to the project, so the same files work on
-# any machine and inside a devcontainer.
+# Connects the personal base of this machine to a project: .workbench in the project
+# becomes a link to the base, and Claude Code gets the base's instructions, memory,
+# hooks and skills through local files. Nothing is committed into the project: every
+# path made there is listed in the project's .git/info/exclude and recorded in a state
+# file inside its git dir, so that detach removes exactly that.
 #
-# Usage: attach.sh [<project-dir>]            connect (default: the hosting project)
-#        attach.sh --detach [<project-dir>]   remove exactly what attach created
+# Usage (normally through the workbench command):
+#   attach.sh [<folder>]            connect to the project of the folder (default: current)
+#   attach.sh --detach [<folder>]   remove exactly what attach made; the base stays
 set -eu
 
 WB_DIR="$(cd "$(dirname "$0")/.." && pwd -P)"
@@ -19,19 +20,19 @@ MARK="workbench:attach"
 HOOKS='$CLAUDE_PROJECT_DIR/.workbench/adapters/claude/hooks'
 
 die() {
-  echo "attach: $*" >&2
+  echo "workbench: $*" >&2
   exit 1
 }
 
-# Sets TARGET, STATE and EXCLUDE; the project must host this clone as .workbench.
+# Sets TARGET (the root of the folder's project), STATE and EXCLUDE.
 use_target() {
-  target_dir="$1"
-  if [ -z "$target_dir" ]; then
-    target_dir="$(wb_host_project)" || die "clone workbench into <project>/.workbench first"
-  fi
-  TARGET="$(cd "$target_dir" 2>/dev/null && pwd -P)" || die "no such directory: $target_dir"
-  [ "$(cd "$TARGET/.workbench" 2>/dev/null && pwd -P)" = "$WB_DIR" ] || die "this clone is not $TARGET/.workbench"
-  git_dir="$(git -C "$TARGET" rev-parse --absolute-git-dir 2>/dev/null)" || die "not a git repository: $TARGET"
+  target_dir="${1:-.}"
+  [ -d "$target_dir" ] || die "нет такой папки: $target_dir"
+  TARGET="$(git -C "$target_dir" rev-parse --show-toplevel 2>/dev/null)" ||
+    die "это не git-проект: $target_dir. Запусти команду в папке проекта."
+  TARGET="$(cd "$TARGET" && pwd -P)"
+  [ "$TARGET" != "$WB_DIR" ] || die "это сама личная база: подключать её к себе не нужно"
+  git_dir="$(git -C "$TARGET" rev-parse --absolute-git-dir)"
   STATE="$git_dir/workbench-attach.state"
   EXCLUDE="$git_dir/info/exclude"
 }
@@ -40,20 +41,25 @@ record() {
   echo "$1 $2" >>"$STATE"
 }
 
-# The clone itself stays excluded while it exists, even after --detach.
-exclude_clone() {
-  mkdir -p "$(dirname "$EXCLUDE")"
-  if ! grep -qxF '/.workbench/' "$EXCLUDE" 2>/dev/null; then
-    printf '# workbench clone: personal, never commit\n/.workbench/\n' >>"$EXCLUDE"
+# .workbench becomes a link to the base. The link is absolute: a moved project keeps it,
+# and a devcontainer that mounts the base at the same path sees it too.
+link_base() {
+  base_link="$TARGET/.workbench"
+  if [ -L "$base_link" ]; then
+    wb_unlink "$base_link"
+  elif [ -e "$base_link" ]; then
+    die "в проекте уже есть .workbench, и это не ссылка (старая копия базы?): $base_link. Убедись, что в ней нет несохранённого, убери её и повтори."
   fi
+  wb_link "$WB_DIR" "$base_link"
+  record link .workbench
 }
 
 claude_block() {
   cat <<EOF
-<!-- $MARK begin: local lines, never commit them. Remove with: .workbench/scripts/attach.sh --detach -->
+<!-- $MARK begin: local lines, never commit them. Remove with: workbench detach -->
 # Подключён workbench
 
-- \$WORKBENCH = .workbench (клон личного workbench)
+- \$WORKBENCH = .workbench (ссылка на личную базу этой машины)
 - \$FPF = .workbench/.fpf (закреплённое издание FPF)
 
 @.workbench/AGENTS.md
@@ -127,7 +133,7 @@ write_settings() {
     # Merge into a temporary file: the project's own file changes only on success.
     if ! printf '%s' "$ours" | jq -s "$MERGE_JQ" "$settings_file.wb-backup" - >"$settings_file.wb-tmp"; then
       rm -f "$settings_file.wb-tmp"
-      die "cannot merge into $settings_file (left unchanged; run --detach to clean up)"
+      die "cannot merge into $settings_file (left unchanged; run workbench detach to clean up)"
     fi
     mv "$settings_file.wb-tmp" "$settings_file"
   else
@@ -143,52 +149,65 @@ link_skills() {
   fi
   for skill in "$WB_DIR"/.agents/skills/*/; do
     name="$(basename "$skill")"
-    link="$TARGET/.claude/skills/$name"
-    if [ -e "$link" ] || [ -L "$link" ]; then
-      echo "attach: skill $name already exists in the project, skipped" >&2
+    skill_link="$TARGET/.claude/skills/$name"
+    if [ -e "$skill_link" ] || [ -L "$skill_link" ]; then
+      echo "workbench: скилл $name в проекте уже есть, пропускаю" >&2
       continue
     fi
-    ln -s "../../.workbench/.agents/skills/$name" "$link"
-    record created ".claude/skills/$name"
+    wb_link "../../.workbench/.agents/skills/$name" "$skill_link"
+    record link ".claude/skills/$name"
   done
 }
 
 write_exclude() {
   {
     echo "# $MARK begin"
-    grep -E '^(created|created-dir|backup) ' "$STATE" | sed 's#^[^ ]* #/#'
+    grep -E '^(link|created|created-dir|backup) ' "$STATE" | sed 's#^[^ ]* #/#'
     if grep -q '^backup ' "$STATE"; then echo "/.claude/settings.local.json.wb-backup"; fi
     echo "# $MARK end"
   } >>"$EXCLUDE"
 }
 
+# A devcontainer sees only the project folder: the base must be mounted at the same path.
+devcontainer_hint() {
+  for config in "$TARGET/.devcontainer/devcontainer.json" "$TARGET/.devcontainer.json"; do
+    [ -f "$config" ] || continue
+    echo "workbench: в контейнере база видна, только если смонтировать её по тому же пути. Добавь в \"mounts\" файла $config:"
+    printf '  {"source": "%s", "target": "%s", "type": "bind"}\n' "$WB_DIR" "$WB_DIR"
+    return 0
+  done
+}
+
 attach() {
-  [ -d "$FPF_DIR" ] || die "FPF edition is not prepared: run .workbench/scripts/setup.sh"
+  [ -d "$FPF_DIR" ] || die "база не подготовлена: запусти sh $WB_DIR/scripts/setup.sh"
+  mkdir -p "$(dirname "$EXCLUDE")"
   : >"$STATE"
-  exclude_clone
+  link_base
   write_claude_local
   write_settings
   link_skills
   write_exclude
-  echo "attached: $TARGET"
+  echo "workbench: подключено к $TARGET (.workbench -> $WB_DIR)"
+  devcontainer_hint
 }
 
 detach() {
-  [ -f "$STATE" ] || die "workbench is not attached to $TARGET"
+  [ -f "$STATE" ] || die "база не подключена к $TARGET"
   # Undo in reverse order: files and links first, then the directories that held them.
   awk '{ lines[NR] = $0 } END { for (i = NR; i > 0; i--) print lines[i] }' "$STATE" |
     while read -r kind rel; do
       case "$kind" in
+        link) wb_unlink "$TARGET/$rel" ;;
         created) rm -f "${TARGET:?}/$rel" ;;
         block) strip_block "$TARGET/$rel" ;;
         backup) mv -f "$TARGET/$rel.wb-backup" "$TARGET/$rel" ;;
-        created-dir) rmdir "$TARGET/$rel" 2>/dev/null || echo "attach: kept non-empty $rel" >&2 ;;
+        created-dir) rmdir "$TARGET/$rel" 2>/dev/null || echo "workbench: оставляю непустую папку $rel" >&2 ;;
       esac
     done
   sed "/^# $MARK begin\$/,/^# $MARK end\$/d" "$EXCLUDE" >"$EXCLUDE.tmp"
   mv "$EXCLUDE.tmp" "$EXCLUDE"
   rm -f "$STATE"
-  echo "detached: $TARGET (the .workbench clone itself is kept and stays excluded)"
+  echo "workbench: отключено от $TARGET; база осталась в $WB_DIR"
 }
 
 case "${1:-}" in
@@ -201,7 +220,7 @@ case "${1:-}" in
     ;;
   *)
     use_target "${1:-}"
-    if [ -f "$STATE" ]; then detach; fi
+    if [ -f "$STATE" ]; then detach >/dev/null; fi
     attach
     ;;
 esac

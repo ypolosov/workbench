@@ -7,15 +7,16 @@ load helpers
 
 setup_file() {
   make_sandbox
-  export P1="$SANDBOX/project-one" WB1="$SANDBOX/project-one/.workbench"
+  export BASE="$SANDBOX/my-workbench" P1="$SANDBOX/project-one"
+  bootstrap "$BASE" --repo "$PRIVATE"
   new_project "$P1"
-  install_into "$P1" --repo "$PRIVATE"
+  wb "$P1" attach
 }
 
 @test "начало сессии: пути к workbench и FPF, закреплённое издание" {
   ctx="$(session_context "$P1")"
-  [[ $ctx == *"\$WORKBENCH = $WB1"* ]]
-  [[ $ctx == *"\$FPF = $WB1/.fpf (издание ${FPF_PINNED:0:7})"* ]]
+  [[ $ctx == *"\$WORKBENCH = $BASE"* ]]
+  [[ $ctx == *"\$FPF = $BASE/.fpf (издание ${FPF_PINNED:0:7})"* ]]
 }
 
 @test "начало сессии: исполняемые части не изменены, предупреждений нет" {

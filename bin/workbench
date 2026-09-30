@@ -1,0 +1,31 @@
+#!/bin/sh
+# workbench command: connects the personal base of this machine to projects.
+# install.sh puts a launcher for it into ~/.local/bin (or --bin-dir).
+set -eu
+
+WB_DIR="$(cd "$(dirname "$0")/.." && pwd -P)"
+
+usage() {
+  cat <<EOF
+workbench - личная база этой машины: $WB_DIR
+
+  workbench attach [<проект>]   подключить базу к проекту (по умолчанию - к текущему)
+  workbench detach [<проект>]   отключить базу от проекта; сама база остаётся
+  workbench help                эта справка
+
+Синхронизация с другими машинами: git -C $WB_DIR pull, затем push.
+Обновления шаблона: git -C $WB_DIR pull template main.
+EOF
+}
+
+command="${1:-help}"
+[ $# -eq 0 ] || shift
+case $command in
+  attach) exec sh "$WB_DIR/scripts/attach.sh" "$@" ;;
+  detach) exec sh "$WB_DIR/scripts/attach.sh" --detach "$@" ;;
+  help | -h | --help) usage ;;
+  *)
+    echo "workbench: неизвестная команда: $command (см. workbench help)" >&2
+    exit 1
+    ;;
+esac

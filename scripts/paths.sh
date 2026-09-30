@@ -1,8 +1,8 @@
 #!/bin/sh
 # Shared definitions for workbench scripts and hooks. POSIX sh gives a sourced file no
-# way to find itself, so the sourcing script sets WB_DIR (the root of this workbench
-# clone) from its own location first, then sources this file.
-# FPF_DIR:  the pinned FPF worktree inside the clone.
+# way to find itself, so the sourcing script sets WB_DIR (the root of the personal base)
+# from its own location first, then sources this file.
+# FPF_DIR:  the pinned FPF worktree inside the base.
 # OVERLAY:  optional personal Claude Code settings merged into generated ones.
 # MERGE_JQ: jq program merging two JSON documents .[0] and .[1]: objects
 #           recursively, arrays concatenated without duplicates, other values from .[1].
@@ -21,14 +21,6 @@ MERGE_JQ='
              elif ($a[$k] | type) == "array" and ($b[$k] | type) == "array" then ($a[$k] + $b[$k] | unique)
              else $b[$k] end));
   m(.[0]; .[1])'
-
-# Prints the project that hosts this clone as <project>/.workbench; fails otherwise.
-wb_host_project() {
-  [ "$(basename "$WB_DIR")" = ".workbench" ] || return 1
-  wb_parent="$(dirname "$WB_DIR")"
-  git -C "$wb_parent" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 1
-  printf '%s\n' "$wb_parent"
-}
 
 # Prints a value from .fpf-edition (key=value lines).
 wb_fpf_edition() {
@@ -55,5 +47,34 @@ wb_with_overlay() {
     printf '%s' "$1" | jq -s "$MERGE_JQ" - "$OVERLAY"
   else
     printf '%s\n' "$1"
+  fi
+}
+
+# True under Git Bash, MSYS2 or Cygwin on Windows, where a link to a folder is a
+# junction: it needs no administrator rights, and git and editors follow it.
+wb_windows() {
+  case "$(uname -s)" in
+    MINGW* | MSYS* | CYGWIN*) return 0 ;;
+  esac
+  return 1
+}
+
+# wb_link <target> <link>: a link to a folder; a relative target counts from the
+# link's own folder.
+wb_link() {
+  if wb_windows; then
+    wb_target="$(cd "$(dirname "$2")" && cd "$1" && pwd -P)"
+    cmd //c mklink /J "$(cygpath -w "$2")" "$(cygpath -w "$wb_target")" >/dev/null
+  else
+    ln -s "$1" "$2"
+  fi
+}
+
+# wb_unlink <link>: removes the link only, never the folder it points to.
+wb_unlink() {
+  if wb_windows; then
+    cmd //c rmdir "$(cygpath -w "$1")" >/dev/null
+  else
+    rm -f "$1"
   fi
 }

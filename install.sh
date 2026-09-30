@@ -1,42 +1,45 @@
 #!/bin/sh
-# workbench installer. Run it in the root of a target project:
+# workbench installer (bootstrap): makes the personal base of this machine and installs
+# the workbench command. Run it anywhere:
 #
 #   curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh | sh
-#   curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh | sh -s -- \
-#     --repo git@gitlab.com:you/my-workbench.git
 #
-# It puts the owner's private knowledge-base repository into ./.workbench (creating
-# it from the public template when that repository is empty or missing), prepares the
-# pinned FPF edition and connects the workbench to the project without touching the
-# project's history. Re-running it in the same project updates the workbench.
+# The base is the only local clone of the owner's private repository on this machine;
+# when that repository is empty or missing, it is created from the public template.
+# Running the installer again for the same folder updates the base. Projects are
+# connected afterwards, one by one: `workbench attach` in the project's folder.
 set -eu
 
 TEMPLATE="${WORKBENCH_TEMPLATE:-https://github.com/ypolosov/workbench.git}"
 REPO="${WORKBENCH_REPO:-}"
-BASE="${WORKBENCH_BASE:-}"
+SPACE="${WORKBENCH_SPACE:-}"
 NAME="${WORKBENCH_NAME:-my-workbench}"
+DIR="${WORKBENCH_DIR:-}"
+BIN_DIR="${WORKBENCH_BIN_DIR:-$HOME/.local/bin}"
 ASSUME_YES="${WORKBENCH_YES:-0}"
-DEST=".workbench"
 
 usage() {
   cat <<'EOF'
-Установка workbench в текущий проект (запускать в корне git-проекта).
+Установка личной базы workbench на эту машину.
 
   curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh | sh
   curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh | sh -s -- \
-    --repo git@gitlab.com:you/my-workbench.git
+    --repo git@gitlab.com:you/my-workbench.git --dir ~/my-workbench
 
 Параметры (в скобках - переменные окружения):
-  --repo URL      адрес закрытого хранилища с личной базой             [WORKBENCH_REPO]
-  --base URL      пространство для нового хранилища,                    [WORKBENCH_BASE]
+  --repo URL      закрытое хранилище личной базы                          [WORKBENCH_REPO]
+  --space URL     пространство для нового хранилища,                       [WORKBENCH_SPACE]
                   например git@gitlab.com:you или https://gitlab.com/you
-  --name NAME     имя хранилища вместе с --base, по умолчанию my-workbench [WORKBENCH_NAME]
-  --template URL  публичный шаблон, по умолчанию                        [WORKBENCH_TEMPLATE]
+  --name NAME     имя хранилища вместе с --space, по умолчанию my-workbench [WORKBENCH_NAME]
+  --dir PATH      папка базы на этой машине, по умолчанию ./<имя>           [WORKBENCH_DIR]
+  --bin-dir PATH  куда поставить команду workbench, по умолчанию ~/.local/bin [WORKBENCH_BIN_DIR]
+  --template URL  публичный шаблон, по умолчанию                           [WORKBENCH_TEMPLATE]
                   https://github.com/ypolosov/workbench.git
-  --yes           ничего не спрашивать; создать хранилище, если его нет [WORKBENCH_YES=1]
+  --yes           ничего не спрашивать; создать хранилище, если его нет    [WORKBENCH_YES=1]
   -h, --help      эта справка
 
-Без --repo и --base установщик спрашивает адрес в терминале.
+Без параметров установщик спрашивает всё в терминале. Если папка базы уже есть,
+установщик обновляет базу и заново ставит команду workbench.
 EOF
 }
 
@@ -52,6 +55,10 @@ die() {
 # Answers come from the terminal: under curl | sh, stdin is the script itself.
 have_tty() {
   (: </dev/tty) 2>/dev/null
+}
+
+interactive() {
+  [ "$ASSUME_YES" != 1 ] && have_tty
 }
 
 # ask <prompt> [default]: prints the answer read from the terminal.
@@ -82,12 +89,20 @@ parse_args() {
         REPO="${2:?--repo: нужен адрес}"
         shift 2
         ;;
-      --base)
-        BASE="${2:?--base: нужен адрес}"
+      --space)
+        SPACE="${2:?--space: нужен адрес}"
         shift 2
         ;;
       --name)
         NAME="${2:?--name: нужно имя}"
+        shift 2
+        ;;
+      --dir)
+        DIR="${2:?--dir: нужна папка}"
+        shift 2
+        ;;
+      --bin-dir)
+        BIN_DIR="${2:?--bin-dir: нужна папка}"
         shift 2
         ;;
       --template)
@@ -110,41 +125,69 @@ parse_args() {
 check_environment() {
   command -v git >/dev/null || die "нужен git"
   command -v jq >/dev/null || die "нужен jq: https://jqlang.org"
-  top="$(git rev-parse --show-toplevel 2>/dev/null)" || die "запусти установщик в корне git-проекта"
-  [ "$(cd "$top" && pwd -P)" = "$(pwd -P)" ] || die "запусти установщик в корне проекта: $top"
 }
 
-# Sets REPO from --repo, from --base and --name, or from answers in the terminal.
+# absolute <path>: the path made absolute, with a leading ~ expanded. An answer read
+# from the terminal holds a literal ~, which the shell never expanded.
+absolute() {
+  # shellcheck disable=SC2088
+  case "$1" in
+    "~") printf '%s\n' "$HOME" ;;
+    "~/"*) printf '%s/%s\n' "$HOME" "${1#"~/"}" ;;
+    /*) printf '%s\n' "$1" ;;
+    *) printf '%s/%s\n' "$PWD" "$1" ;;
+  esac
+}
+
+# Sets DIR: from --dir, from the answer in the terminal, or ./<name>.
+resolve_dir() {
+  if [ -z "$DIR" ]; then
+    DIR="$PWD/$NAME"
+    if interactive; then DIR="$(ask "Папка личной базы на этой машине" "$DIR")"; fi
+  fi
+  DIR="$(absolute "$DIR")"
+  BIN_DIR="$(absolute "$BIN_DIR")"
+}
+
+# Sets REPO from --repo, from --space and --name, or from answers in the terminal.
 resolve_repo() {
   [ -n "$REPO" ] && return 0
-  if [ -z "$BASE" ] && [ "$ASSUME_YES" != 1 ] && have_tty; then
+  if [ -z "$SPACE" ] && interactive; then
     REPO="$(ask "Адрес закрытого хранилища для личной базы (пусто - собрать из пространства и имени)" "")"
     [ -n "$REPO" ] && return 0
-    BASE="$(ask "Пространство, например git@gitlab.com:you или https://gitlab.com/you" "")"
+    SPACE="$(ask "Пространство, например git@gitlab.com:you или https://gitlab.com/you" "")"
     NAME="$(ask "Имя хранилища" "$NAME")"
   fi
-  [ -n "$BASE" ] || die "не задано закрытое хранилище: --repo URL или --base URL [--name NAME] (см. --help)"
-  REPO="${BASE%/}/${NAME%.git}.git"
+  [ -n "$SPACE" ] || die "не задано закрытое хранилище: --repo URL или --space URL [--name NAME] (см. --help)"
+  REPO="${SPACE%/}/${NAME%.git}.git"
+}
+
+# An existing base is updated; a folder with something else is left alone.
+existing_base() {
+  [ -e "$DIR" ] || return 1
+  if [ -f "$DIR/scripts/setup.sh" ] && git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1; then
+    return 0
+  fi
+  [ -z "$(ls -A "$DIR" 2>/dev/null)" ] || die "в $DIR уже что-то есть, и это не личная база workbench"
+  return 1
+}
+
+update_base() {
+  say "база уже есть в $DIR: обновляю"
+  if git -C "$DIR" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
+    git -C "$DIR" pull -q --ff-only || die "не удалось обновить $DIR, разберись вручную"
+  fi
 }
 
 # Creates the private repository from the template. The template stays a remote, so
-# its updates merge with: git -C .workbench pull template main
-bootstrap() {
+# its updates merge with: git pull template main
+create_from_template() {
   say "создаю личную базу из шаблона $TEMPLATE"
-  git clone -q --origin template "$TEMPLATE" "$DEST"
-  git -C "$DEST" remote add origin "$REPO"
-  if ! git -C "$DEST" push -u origin HEAD; then
+  git clone -q --origin template "$TEMPLATE" "$DIR"
+  git -C "$DIR" remote add origin "$REPO"
+  if ! git -C "$DIR" push -u origin HEAD; then
     die "не удалось отправить в $REPO. Создай там пустое закрытое хранилище и выполни:
-  git -C $DEST push -u origin HEAD && sh $DEST/scripts/setup.sh"
-  fi
-}
-
-# Keeps .workbench out of the project's git from the start, even if setup fails later.
-exclude_dest() {
-  exclude="$(git rev-parse --absolute-git-dir)/info/exclude"
-  mkdir -p "$(dirname "$exclude")"
-  if ! grep -qxF "/$DEST/" "$exclude" 2>/dev/null; then
-    printf '# workbench clone: personal, never commit\n/%s/\n' "$DEST" >>"$exclude"
+  git -C $DIR push -u origin HEAD && sh $DIR/scripts/setup.sh"
   fi
 }
 
@@ -152,53 +195,68 @@ exclude_dest() {
 # "master" that received "main") is cloned without a checkout: pick main or the
 # first branch.
 ensure_checkout() {
-  git -C "$DEST" rev-parse --verify -q HEAD >/dev/null && return 0
-  branches="$(git -C "$DEST" for-each-ref --format='%(refname:lstrip=3)' refs/remotes/origin | grep -vx HEAD || true)"
+  git -C "$DIR" rev-parse --verify -q HEAD >/dev/null && return 0
+  branches="$(git -C "$DIR" for-each-ref --format='%(refname:lstrip=3)' refs/remotes/origin | grep -vx HEAD || true)"
   branch="$(printf '%s\n' "$branches" | grep -x main || printf '%s\n' "$branches" | head -n 1)"
   [ -n "$branch" ] || die "в $REPO нет веток"
-  git -C "$DEST" checkout -q -B "$branch" "origin/$branch"
+  git -C "$DIR" checkout -q -B "$branch" "origin/$branch"
 }
 
-install_clone() {
+make_base() {
+  mkdir -p "$(dirname "$DIR")"
   rc=0
   git ls-remote --exit-code --heads "$REPO" >/dev/null 2>&1 || rc=$?
   case "$rc" in
     0)
       say "клонирую личную базу $REPO"
-      git clone -q "$REPO" "$DEST"
+      git clone -q "$REPO" "$DIR"
       ensure_checkout
-      git -C "$DEST" remote get-url template >/dev/null 2>&1 || git -C "$DEST" remote add template "$TEMPLATE"
+      git -C "$DIR" remote get-url template >/dev/null 2>&1 || git -C "$DIR" remote add template "$TEMPLATE"
       ;;
     2)
       say "хранилище $REPO пустое"
-      bootstrap
+      create_from_template
       ;;
     *)
       confirm "Хранилище $REPO не найдено или нет доступа. Создать его из шаблона? (GitLab создаёт закрытый проект при первой отправке, на GitHub создай пустое закрытое хранилище заранее)" ||
         die "установка остановлена: проверь адрес и доступ к $REPO"
-      bootstrap
+      create_from_template
       ;;
+  esac
+}
+
+# The command is a small launcher: the code lives in the base and updates with it.
+install_command() {
+  mkdir -p "$BIN_DIR"
+  quoted="$(printf '%s' "$DIR/bin/workbench" | sed "s/'/'\\\\''/g")"
+  printf '#!/bin/sh\n# workbench command, made by install.sh: runs the personal base of this machine.\nexec sh '\''%s'\'' "$@"\n' "$quoted" >"$BIN_DIR/workbench"
+  chmod +x "$BIN_DIR/workbench"
+  case ":$PATH:" in
+    *":$BIN_DIR:"*) ;;
+    *) say "папки $BIN_DIR нет в PATH: добавь в профиль оболочки строку  export PATH=\"$BIN_DIR:\$PATH\"" ;;
   esac
 }
 
 main() {
   parse_args "$@"
   check_environment
-  if [ -e "$DEST" ]; then
-    say "$DEST уже есть: обновляю"
-    git -C "$DEST" pull --ff-only || die "не удалось обновить $DEST, разберись вручную"
+  resolve_dir
+  if existing_base; then
+    update_base
   else
     resolve_repo
-    exclude_dest
-    install_clone
+    make_base
   fi
-  sh "$DEST/scripts/setup.sh"
+  sh "$DIR/scripts/setup.sh"
+  install_command
   cat >&2 <<EOF
 
 workbench: готово.
-  Личная база: $DEST ($(git -C "$DEST" remote get-url origin)), git проекта её не видит.
-  Маркеры компании для проверки перед сохранением: $(git -C "$DEST" rev-parse --absolute-git-dir)/info/company-markers
-  Работать: claude в корне проекта. Обновить шаблон: git -C $DEST pull template main
+  Личная база: $DIR ($(git -C "$DIR" remote get-url origin))
+  Команда: $BIN_DIR/workbench
+  Подключить к проекту: в папке проекта  workbench attach
+  Маркеры компании для проверки перед сохранением: $(git -C "$DIR" rev-parse --absolute-git-dir)/info/company-markers
+  Обновления шаблона: git -C $DIR pull template main
 EOF
 }
 

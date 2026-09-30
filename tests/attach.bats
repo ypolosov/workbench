@@ -1,7 +1,6 @@
 #!/usr/bin/env bats
-# First installation into a project whose private repository is still empty and which
-# already has its own local Claude Code files; then re-running the setup, detaching and
-# attaching again. Tests run in file order.
+# Attach and detach: the base of the machine is connected to a project that already has
+# its own local Claude Code files, then disconnected. Tests run in file order.
 
 bats_require_minimum_version 1.5.0
 load helpers
@@ -9,7 +8,8 @@ load helpers
 setup_file() {
   export BATS_NO_PARALLELIZE_WITHIN_FILE=true
   make_sandbox
-  export P1="$SANDBOX/project-one" WB1="$SANDBOX/project-one/.workbench"
+  export BASE="$SANDBOX/my-workbench" P1="$SANDBOX/project-one"
+  bootstrap "$BASE" --repo "$PRIVATE"
   new_project "$P1"
   mkdir "$P1/.claude"
   printf '{"permissions": {"allow": ["Bash(ls:*)"]}}\n' >"$P1/.claude/settings.local.json"
@@ -21,43 +21,16 @@ setup_file() {
   cp "$P1/CLAUDE.local.md" "$SANDBOX/claude-local.orig"
   cp "$P1/.git/info/exclude" "$SANDBOX/exclude.orig"
   project_files "$P1" >"$SANDBOX/files.orig"
-  install_into "$P1" --repo "$PRIVATE"
+  wb "$P1" attach
 }
 
-@test "личная база создана из шаблона и отправлена в закрытое хранилище" {
-  [ "$(git -C "$PRIVATE" rev-parse main)" = "$(git -C "$TPL" rev-parse HEAD)" ]
+@test ".workbench в проекте - ссылка на личную базу машины" {
+  [ -L "$P1/.workbench" ]
+  [ "$(cd "$P1/.workbench" && pwd -P)" = "$BASE" ]
 }
 
-@test "у клона два адреса: личная база (origin) и шаблон (template)" {
-  remotes_ok "$WB1"
-}
-
-@test "git проекта не видит ни клон, ни файлы подключения" {
+@test "git проекта не видит ни ссылку, ни файлы подключения" {
   [ -z "$(git -C "$P1" status --porcelain)" ]
-}
-
-@test "клон исключён в .git/info/exclude проекта" {
-  grep -qxF /.workbench/ "$P1/.git/info/exclude"
-}
-
-@test "FPF: рабочая копия на закреплённом издании" {
-  [ "$(git -C "$WB1/.fpf" rev-parse HEAD)" = "$FPF_PINNED" ]
-}
-
-@test "FPF: скачана одна ревизия, без истории и новых изданий" {
-  only_pinned_fetched "$WB1"
-}
-
-@test "FPF: рабочая копия заперта" {
-  git -C "$WB1" worktree list --porcelain | grep -q '^locked'
-}
-
-@test "FPF: ссылка .fpf/.git относительная" {
-  grep -q '^gitdir: \.\./\.git/worktrees/' "$WB1/.fpf/.git"
-}
-
-@test "проверки git в личной базе включены" {
-  [ "$(git -C "$WB1" config core.hooksPath)" = .githooks ]
 }
 
 @test "свой CLAUDE.local.md проекта сохранён, workbench дописал к нему свой блок" {
@@ -65,11 +38,8 @@ setup_file() {
   grep -q '^<!-- workbench:attach begin' "$P1/CLAUDE.local.md"
 }
 
-@test "CLAUDE.local.md подключает инструкции workbench" {
+@test "CLAUDE.local.md подключает инструкции и личную память из базы" {
   grep -qxF @.workbench/AGENTS.md "$P1/CLAUDE.local.md"
-}
-
-@test "CLAUDE.local.md подключает личную память владельца" {
   grep -qxF @.workbench/memory/MEMORY.md "$P1/CLAUDE.local.md"
 }
 
@@ -84,28 +54,32 @@ setup_file() {
   cmp "$P1/.claude/settings.local.json.wb-backup" "$SANDBOX/settings.orig"
 }
 
-@test "скиллы workbench доступны из проекта" {
+@test "скиллы базы доступны из проекта" {
   skills_linked "$P1"
 }
 
-@test "повторный setup.sh не задваивает подключение" {
-  sh "$WB1/scripts/setup.sh"
+@test "повторное подключение не задваивает подключение" {
+  wb "$P1" attach
   [ "$(grep -c '^# workbench:attach begin$' "$P1/.git/info/exclude")" = 1 ]
   [ "$(grep -c '^@.workbench/AGENTS.md$' "$P1/CLAUDE.local.md")" = 1 ]
   cmp "$P1/.claude/settings.local.json.wb-backup" "$SANDBOX/settings.orig"
 }
 
-@test "отключение возвращает проект в прежнее состояние" {
-  sh "$WB1/scripts/attach.sh" --detach "$P1"
+@test "отключение возвращает проект в прежнее состояние, а база остаётся" {
+  wb "$P1" detach
+  [ ! -e "$P1/.workbench" ] && [ ! -L "$P1/.workbench" ]
   [ "$(project_files "$P1")" = "$(cat "$SANDBOX/files.orig")" ]
   cmp "$P1/.claude/settings.local.json" "$SANDBOX/settings.orig"
   cmp "$P1/CLAUDE.local.md" "$SANDBOX/claude-local.orig"
-  exclude_restored "$P1" "$SANDBOX/exclude.orig"
+  cmp "$P1/.git/info/exclude" "$SANDBOX/exclude.orig"
   [ -z "$(git -C "$P1" status --porcelain)" ]
+  [ -f "$BASE/AGENTS.md" ]
+  [ -z "$(git -C "$BASE" status --porcelain)" ]
 }
 
 @test "повторное подключение после отключения" {
-  sh "$WB1/scripts/attach.sh" "$P1"
+  wb "$P1" attach
+  [ -L "$P1/.workbench" ]
   grep -qxF @.workbench/AGENTS.md "$P1/CLAUDE.local.md"
   [ -z "$(git -C "$P1" status --porcelain)" ]
 }
