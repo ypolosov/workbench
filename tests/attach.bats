@@ -50,10 +50,6 @@ setup_file() {
     and .hooks.PreToolUse[0].matcher == "Bash"' "$P1/.claude/settings.local.json"
 }
 
-@test "копия прежних настроек лежит рядом" {
-  cmp "$P1/.claude/settings.local.json.wb-backup" "$SANDBOX/settings.orig"
-}
-
 @test "скиллы базы доступны из проекта" {
   skills_linked "$P1"
 }

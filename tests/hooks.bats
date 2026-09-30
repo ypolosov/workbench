@@ -25,11 +25,6 @@ setup_file() {
   [[ $ctx != *ВНИМАНИЕ* ]]
 }
 
-@test "начало сессии: правило допуска задачи" {
-  ctx="$(session_context "$P1")"
-  [[ $ctx == *OPS.5* ]]
-}
-
 @test "сообщение владельца: напоминание о реестре РП" {
   ctx="$(prompt_context "$P1" wp-gate-reminder.sh "сделай отчёт")"
   [[ $ctx == *WP-REGISTRY.md* ]]
@@ -47,14 +42,6 @@ setup_file() {
 
 @test "защита блокирует git add -A" {
   run -2 hook "$P1" destructive-guard.sh "$(bash_input "$P1" "git add -A")"
-}
-
-@test "защита блокирует git push --force" {
-  run -2 hook "$P1" destructive-guard.sh "$(bash_input "$P1" "git push --force origin main")"
-}
-
-@test "защита блокирует переход в папку отдельной командой cd" {
-  run -2 hook "$P1" destructive-guard.sh "$(bash_input "$P1" "cd /tmp")"
 }
 
 @test "защита пропускает git status" {

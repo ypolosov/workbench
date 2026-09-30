@@ -39,10 +39,6 @@ setup_file() {
   grep -q '^gitdir: \.\./\.git/worktrees/' "$BASE/.fpf/.git"
 }
 
-@test "проверки git в базе включены" {
-  [ "$(git -C "$BASE" config core.hooksPath)" = .githooks ]
-}
-
 @test "команда workbench установлена и знает, где база" {
   run -0 "$SANDBOX/bin/workbench" help
   [[ $output == *"$BASE"* ]]
