@@ -188,6 +188,7 @@ attach() {
   link_skills
   write_exclude
   echo "workbench: подключено к $TARGET (.workbench -> $WB_DIR)"
+  echo "workbench: инструкции и память базы лежат вне проекта, поэтому при первом запуске в этом проекте Claude Code спросит про внешние импорты: ответь «Yes, allow external imports»."
   devcontainer_hint
 }
 

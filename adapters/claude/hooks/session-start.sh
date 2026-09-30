@@ -37,6 +37,7 @@ active="$(grep -E '^\| *[0-9]+ *\|' "$registry" 2>/dev/null | grep -E '\| *(in_p
 ctx="workbench подключён. Сегодня $(date '+%Y-%m-%d %A').
 Целевой проект: ${cwd}
 \$WORKBENCH = ${WB_DIR} (git: ${sync_state#\#\# })
+Инструкции workbench - ${WB_DIR}/AGENTS.md, личная память владельца - ${WB_DIR}/memory/MEMORY.md. Если их нет в контексте (Claude Code не разрешил внешние импорты), прочитай оба файла.
 ${fpf_line}
 ${warn_line}
 Активные РП (\$WORKBENCH/docs/WP-REGISTRY.md):

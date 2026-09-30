@@ -50,6 +50,12 @@ setup_file() {
   [[ $output == *.workbench* ]]
 }
 
+@test "подключение предупреждает о разовом разрешении внешних импортов в Claude Code" {
+  new_project "$SANDBOX/p-imports"
+  run -0 wb "$SANDBOX/p-imports" attach
+  [[ $output == *"Yes, allow external imports"* ]]
+}
+
 @test "в проекте с контейнером подсказывает, как смонтировать базу" {
   new_project "$SANDBOX/p-dc"
   mkdir "$SANDBOX/p-dc/.devcontainer"
