@@ -41,7 +41,7 @@ wb_files_line() {
 # wb_layers_line <folder>: where the layers of knowledge live for the session's project:
 # the personal LPF and DPFs in the base, the project's in lpf/ and dpf/ of its git.
 wb_layers_line() {
-  wb_layers="Слои знаний (раздел «Слои знаний» в AGENTS.md): личные LPF и DPF - ${WB_DIR}/lpf/ и ${WB_DIR}/dpf/"
+  wb_layers="Слои знаний (раздел 3 в AGENTS.md): личные LPF и DPF - ${WB_DIR}/lpf/ и ${WB_DIR}/dpf/"
   wb_root="$(git -C "$1" rev-parse --show-toplevel 2>/dev/null || true)"
   if [ -n "$wb_root" ] && [ "$(cd "$wb_root" && pwd -P)" != "$WB_DIR" ]; then
     wb_found=""
@@ -95,7 +95,7 @@ ${fpf_line}
 ${warn_line}
 Активные РП (\$WORKBENCH/docs/WP-REGISTRY.md):
 ${active}
-Правило допуска: свяжи задачу с РП и назови его («Работаю по РП N: …»). Подходящего нет - предложи принять, отложить, отклонить или вернуть (OPS.5); новый РП заводи скиллом wp-new только после явного «да».
+Правило допуска: свяжи задачу с РП и назови его ("Работаю по РП N: ..."). Подходящего нет - предложи принять, отложить, отклонить или вернуть (OPS.5); новый РП заводи скиллом wp-new только после явного "да".
 Граница: в \$WORKBENCH пишется только личное (РП, личные решения, факты о владельце). Код, данные и факты целевого проекта - только в сам проект или во встроенную память агента для этого проекта, никогда в \$WORKBENCH.
 EOF
 }

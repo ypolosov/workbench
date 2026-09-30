@@ -12,7 +12,7 @@ while read -r _ local_sha remote_ref remote_sha; do
   [ "$remote_sha" = "$zero" ] && continue
   if ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
     echo ""
-    echo "❌ Push blocked: $remote_ref is not a fast-forward."
+    echo "Push blocked: $remote_ref is not a fast-forward."
     echo "   This overwrites history and may destroy parallel agent work."
     echo "   Override (if authorized): ALLOW_FORCE_PUSH=1 git push --force"
     exit 1

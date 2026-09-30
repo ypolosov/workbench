@@ -11,9 +11,9 @@
 
 - Автор: Tseren Tserenov. Источник: https://github.com/TserenTserenov/FMT-exocortex-template
 - Лицензия: MIT (текст ниже).
-- Взято без изменений: `.agents/skills/vdv/SKILL.md`, `.agents/skills/vdv/test_cases.md`.
+- Взято с одной правкой: значки вердикта и другие символы вне клавиатуры заменены словами и знаками ASCII: `.agents/skills/vdv/SKILL.md`, `.agents/skills/vdv/test_cases.md`.
 - Адаптировано и переведено на POSIX sh: `.githooks/pre-push`, `adapters/claude/hooks/wp-gate-reminder.sh`, `adapters/claude/hooks/close-gate-reminder.sh`.
-- По мотивам (новые тексты и код): правила в `AGENTS.md`, скиллы `wp-new` и `close-session`, соглашение «один РП - одна папка», правила защиты `adapters/claude/hooks/destructive-guard.sh` (переписана заново на POSIX sh и awk).
+- По мотивам (новые тексты и код): правила в `AGENTS.md`, скиллы `wp-new` и `close-session`, соглашение "один РП - одна папка", правила защиты `adapters/claude/hooks/destructive-guard.sh` (переписана заново на POSIX sh и awk).
 
 ### Текст лицензии MIT
 

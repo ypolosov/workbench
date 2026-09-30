@@ -38,7 +38,7 @@ setup_file() {
   [[ $ctx == *WP-REGISTRY.md* ]]
 }
 
-@test "«Закрывай» с заглавной буквы вызывает скилл закрытия" {
+@test "Закрывай с заглавной буквы вызывает скилл закрытия" {
   ctx="$(prompt_context "$P1" close-gate-reminder.sh "Закрывай")"
   [[ $ctx == *close-session* ]]
 }
