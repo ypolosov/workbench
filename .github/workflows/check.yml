@@ -36,6 +36,9 @@ jobs:
     defaults:
       run:
         shell: bash
+    # bats needs a UTF-8 locale for the non-ASCII test names; Git Bash starts without one.
+    env:
+      LC_ALL: C.UTF-8
     steps:
       - uses: actions/checkout@v7
       - name: Tools
