@@ -67,3 +67,48 @@ setup_file() {
   [[ $output == *"\"source\": \"$BASE\", \"target\": \"$BASE\""* ]]
   [[ $output == *"sh \"$BASE/bin/workbench\" attach --user"* ]]
 }
+
+@test "подсказка attach --user называет только агентов, у которых блока нет" {
+  new_project "$SANDBOX/p-half"
+  (
+    export CLAUDE_CONFIG_DIR="$SANDBOX/claude-half" CODEX_HOME="$SANDBOX/codex-half"
+    wb "$SANDBOX/p-half" attach --user
+    rm "$CODEX_HOME/AGENTS.md"
+    run -0 wb "$SANDBOX/p-half" attach
+    [[ $output == *"Codex ($CODEX_HOME/AGENTS.md)"* ]]
+    [[ $output != *"Claude Code ("* ]]
+    [[ $output == *"workbench attach --user"* ]]
+  )
+}
+
+@test "в проекте, где контейнер уже монтирует базу по тому же пути, подсказки о контейнере нет" {
+  new_project "$SANDBOX/p-dc-mounted"
+  mkdir "$SANDBOX/p-dc-mounted/.devcontainer"
+  {
+    printf '{\n  // the personal base, at the same path\n  "mounts": [\n    {\n'
+    # A devcontainer variable, not shell text.
+    # shellcheck disable=SC2016
+    printf '      "source": "${localEnv:HOME}/elsewhere",\n      "target": "%s",\n' "$BASE"
+    printf '      "type": "bind"\n    },\n  ],\n}\n'
+  } >"$SANDBOX/p-dc-mounted/.devcontainer/devcontainer.json"
+  run -0 wb "$SANDBOX/p-dc-mounted" attach
+  [[ $output != *"в контейнере база видна"* ]]
+}
+
+@test "монтирование базы строкой тоже гасит подсказку о контейнере" {
+  new_project "$SANDBOX/p-dc-string"
+  mkdir "$SANDBOX/p-dc-string/.devcontainer"
+  printf '{"mounts": ["source=/somewhere,target=%s,type=bind"]}\n' "$BASE" \
+    >"$SANDBOX/p-dc-string/.devcontainer/devcontainer.json"
+  run -0 wb "$SANDBOX/p-dc-string" attach
+  [[ $output != *"в контейнере база видна"* ]]
+}
+
+@test "монтирование в соседнюю папку подсказку о контейнере не гасит" {
+  new_project "$SANDBOX/p-dc-other"
+  mkdir "$SANDBOX/p-dc-other/.devcontainer"
+  printf '{"mounts": [{"source": "%s", "target": "%s-other", "type": "bind"}]}\n' "$BASE" "$BASE" \
+    >"$SANDBOX/p-dc-other/.devcontainer/devcontainer.json"
+  run -0 wb "$SANDBOX/p-dc-other" attach
+  [[ $output == *"в контейнере база видна"* ]]
+}

@@ -251,10 +251,19 @@ write_exclude() {
   } >>"$EXCLUDE"
 }
 
+# base_mounted <devcontainer.json>: the container already mounts the base at its own path,
+# as an object ("target": "<base>") or as a string (target=<base>). The file is JSON with
+# comments, so it is read as text rather than with jq.
+base_mounted() {
+  re="$(printf '%s' "$WB_DIR" | sed 's/[][\.*^$+?(){}|]/\\&/g')"
+  grep -Eq "\"target\"[[:space:]]*:[[:space:]]*\"$re\"|target=$re(,|\")" "$1"
+}
+
 # A devcontainer sees only the project folder: the base must be mounted at the same path.
 devcontainer_hint() {
   for config in "$TARGET/.devcontainer/devcontainer.json" "$TARGET/.devcontainer.json"; do
     [ -f "$config" ] || continue
+    base_mounted "$config" && return 0
     echo "workbench: в контейнере база видна, только если смонтировать её по тому же пути. Добавь в \"mounts\" файла $config:"
     printf '  {"source": "%s", "target": "%s", "type": "bind"}\n' "$WB_DIR" "$WB_DIR"
     printf 'workbench: у агентов в контейнере бывает своя папка настроек; тогда подключи там инструкции и память базы командой  sh "%s/bin/workbench" attach --user\n' "$WB_DIR"
@@ -262,10 +271,13 @@ devcontainer_hint() {
   done
 }
 
+# Names only the agents whose user-level block is missing.
 user_hint() {
-  if ! wb_user_attached || ! wb_codex_attached; then
-    echo "workbench: инструкции и память базы на уровне пользователя подключены не для всех агентов (Claude Code: $(wb_user_claude_md), Codex: $(wb_codex_agents_md)). Подключи их один раз на этой машине: workbench attach --user"
-  fi
+  missing=""
+  wb_user_attached || missing="Claude Code ($(wb_user_claude_md))"
+  wb_codex_attached || missing="${missing:+$missing, }Codex ($(wb_codex_agents_md))"
+  [ -z "$missing" ] ||
+    echo "workbench: инструкции и память базы на уровне пользователя не подключены для $missing. Подключи их один раз на этой машине: workbench attach --user"
 }
 
 attach() {
