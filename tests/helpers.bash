@@ -99,7 +99,8 @@ hook() {
 # hook_from <settings file> <project> <script> <json>: the same for any settings file.
 hook_from() {
   local cmd
-  cmd="$(jq -r --arg s "/$3" '[.. | objects | .command? | strings | select(contains($s))][0] // empty' "$1")"
+  # The script name goes in without a leading slash: Git Bash rewrites such arguments as paths.
+  cmd="$(jq -r --arg s "$3" '[.. | objects | .command? | strings | select(contains("/" + $s))][0] // empty' "$1")"
   [ -n "$cmd" ] || return 90
   (cd "$2" && printf '%s' "$4" | CLAUDE_PROJECT_DIR="$2" sh -c "$cmd")
 }
@@ -136,9 +137,23 @@ commit_note() {
 
 # --- predicates -------------------------------------------------------------------
 
+# same_dir <a> <b>: both paths name the same folder; Git for Windows prints C:/ paths.
+same_dir() {
+  [ "$(cd "$1" 2>/dev/null && pwd -P)" = "$(cd "$2" 2>/dev/null && pwd -P)" ]
+}
+
 remotes_ok() {
-  [ "$(git -C "$1" remote get-url origin)" = "$PRIVATE" ] &&
-    [ "$(git -C "$1" remote get-url template)" = "$TPL" ]
+  same_dir "$(git -C "$1" remote get-url origin)" "$PRIVATE" &&
+    same_dir "$(git -C "$1" remote get-url template)" "$TPL"
+}
+
+# worktree_listed <repo> <dir>: git's record of the repository's worktrees names the folder.
+worktree_listed() {
+  local wt
+  while IFS= read -r wt; do
+    same_dir "$wt" "$2" && return 0
+  done < <(git -C "$1" worktree list --porcelain | sed -n 's/^worktree //p')
+  return 1
 }
 
 # Only the pinned FPF edition is in the clone: neither its history nor later editions.

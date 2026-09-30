@@ -29,7 +29,7 @@ setup_file() {
   mkdir "$SANDBOX/elsewhere"
   mv "$BASE" "$newbase"
   bootstrap "$newbase"
-  git -C "$newbase" worktree list --porcelain | grep -qxF "worktree $newbase/.fpf"
+  worktree_listed "$newbase" "$newbase/.fpf"
   [ "$(git -C "$newbase/.fpf" rev-parse HEAD)" = "$FPF_PINNED" ]
   wb "$MOVED" attach
   [ "$(cd "$MOVED/.workbench" && pwd -P)" = "$newbase" ]
