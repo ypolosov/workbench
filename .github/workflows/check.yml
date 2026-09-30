@@ -24,8 +24,9 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
+      # The system bash 3.2 garbles non-ASCII test names in bats: use a current bash.
       - name: Tools
-        run: brew install bats-core
+        run: brew install bash bats-core
       - name: Tests
         run: bats tests
 

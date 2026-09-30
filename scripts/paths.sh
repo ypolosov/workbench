@@ -59,12 +59,18 @@ wb_windows() {
   return 1
 }
 
+# wb_cmd <args...>: runs cmd.exe with its switches (/c, /J) passed as they are: Git Bash
+# and MSYS2 would otherwise rewrite them as paths.
+wb_cmd() {
+  MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' cmd "$@"
+}
+
 # wb_link <target> <link>: a link to a folder; a relative target counts from the
 # link's own folder.
 wb_link() {
   if wb_windows; then
     wb_target="$(cd "$(dirname "$2")" && cd "$1" && pwd -P)"
-    cmd //c mklink /J "$(cygpath -w "$2")" "$(cygpath -w "$wb_target")" >/dev/null
+    wb_cmd /c mklink /J "$(cygpath -w "$2")" "$(cygpath -w "$wb_target")" >/dev/null
   else
     ln -s "$1" "$2"
   fi
@@ -73,7 +79,7 @@ wb_link() {
 # wb_unlink <link>: removes the link only, never the folder it points to.
 wb_unlink() {
   if wb_windows; then
-    cmd //c rmdir "$(cygpath -w "$1")" >/dev/null
+    wb_cmd /c rmdir "$(cygpath -w "$1")" >/dev/null
   else
     rm -f "$1"
   fi
