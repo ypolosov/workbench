@@ -17,6 +17,6 @@ setup_file() {
 @test "в рабочей копии шаблона у Claude Code только инструкции и хуки личной базы" {
   [ ! -e "$DEV/CLAUDE.md" ]
   [ ! -e "$DEV/.claude/settings.json" ]
-  grep -qxF @.workbench/AGENTS.md "$DEV/CLAUDE.local.md"
+  [ ! -e "$DEV/CLAUDE.local.md" ]
   [ "$(jq -r '[.. | objects | .command? | strings] | map(select(contains("/.workbench/"))) | length' "$DEV/.claude/settings.local.json")" = 4 ]
 }

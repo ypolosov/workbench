@@ -15,6 +15,8 @@ setup_file() {
   run -0 "$SANDBOX/bin/workbench" help
   [[ $output == *attach* ]]
   [[ $output == *detach* ]]
+  [[ $output == *"attach --user"* ]]
+  [[ $output == *"detach --user"* ]]
 }
 
 @test "неизвестная команда - понятная ошибка" {
@@ -50,16 +52,18 @@ setup_file() {
   [[ $output == *.workbench* ]]
 }
 
-@test "подключение предупреждает о разовом разрешении внешних импортов в Claude Code" {
+@test "подключение проекта без инструкций базы на уровне пользователя подсказывает attach --user" {
   new_project "$SANDBOX/p-imports"
   run -0 wb "$SANDBOX/p-imports" attach
-  [[ $output == *"Yes, allow external imports"* ]]
+  [[ $output == *"workbench attach --user"* ]]
+  [[ $output != *"allow external imports"* ]]
 }
 
-@test "в проекте с контейнером подсказывает, как смонтировать базу" {
+@test "в проекте с контейнером подсказывает, как смонтировать базу и подключить её инструкции в контейнере" {
   new_project "$SANDBOX/p-dc"
   mkdir "$SANDBOX/p-dc/.devcontainer"
   printf '{}\n' >"$SANDBOX/p-dc/.devcontainer/devcontainer.json"
   run -0 wb "$SANDBOX/p-dc" attach
   [[ $output == *"\"source\": \"$BASE\", \"target\": \"$BASE\""* ]]
+  [[ $output == *"sh \"$BASE/bin/workbench\" attach --user"* ]]
 }

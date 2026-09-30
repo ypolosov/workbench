@@ -34,10 +34,17 @@ registry="$WB_DIR/docs/WP-REGISTRY.md"
 active="$(grep -E '^\| *[0-9]+ *\|' "$registry" 2>/dev/null | grep -E '\| *(in_progress|pending|deferred) *\|' || true)"
 [ -n "$active" ] || active="(активных РП нет)"
 
+files_line="Инструкции workbench - ${WB_DIR}/AGENTS.md, личная память владельца - ${WB_DIR}/memory/MEMORY.md"
+if wb_user_attached; then
+  files_line="${files_line}; Claude Code загружает их из $(wb_user_claude_md)."
+else
+  files_line="${files_line}. В $(wb_user_claude_md) их нет: прочитай оба файла и предложи владельцу подключить их командой workbench attach --user (если команды нет в PATH: sh \"${WB_DIR}/bin/workbench\" attach --user)."
+fi
+
 ctx="workbench подключён. Сегодня $(date '+%Y-%m-%d %A').
 Целевой проект: ${cwd}
 \$WORKBENCH = ${WB_DIR} (git: ${sync_state#\#\# })
-Инструкции workbench - ${WB_DIR}/AGENTS.md, личная память владельца - ${WB_DIR}/memory/MEMORY.md. Если их нет в контексте (Claude Code не разрешил внешние импорты), прочитай оба файла.
+${files_line}
 ${fpf_line}
 ${warn_line}
 Активные РП (\$WORKBENCH/docs/WP-REGISTRY.md):

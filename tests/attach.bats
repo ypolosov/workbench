@@ -33,14 +33,8 @@ setup_file() {
   [ -z "$(git -C "$P1" status --porcelain)" ]
 }
 
-@test "свой CLAUDE.local.md проекта сохранён, workbench дописал к нему свой блок" {
-  head -n 3 "$P1/CLAUDE.local.md" | cmp - "$SANDBOX/claude-local.orig"
-  grep -q '^<!-- workbench:attach begin' "$P1/CLAUDE.local.md"
-}
-
-@test "CLAUDE.local.md подключает инструкции и личную память из базы" {
-  grep -qxF @.workbench/AGENTS.md "$P1/CLAUDE.local.md"
-  grep -qxF @.workbench/memory/MEMORY.md "$P1/CLAUDE.local.md"
+@test "свой CLAUDE.local.md проекта подключение не трогает" {
+  cmp "$P1/CLAUDE.local.md" "$SANDBOX/claude-local.orig"
 }
 
 @test "свои настройки Claude Code в проекте сохранены, хуки добавлены" {
@@ -57,7 +51,6 @@ setup_file() {
 @test "повторное подключение не задваивает подключение" {
   wb "$P1" attach
   [ "$(grep -c '^# workbench:attach begin$' "$P1/.git/info/exclude")" = 1 ]
-  [ "$(grep -c '^@.workbench/AGENTS.md$' "$P1/CLAUDE.local.md")" = 1 ]
   cmp "$P1/.claude/settings.local.json.wb-backup" "$SANDBOX/settings.orig"
 }
 
@@ -76,6 +69,13 @@ setup_file() {
 @test "повторное подключение после отключения" {
   wb "$P1" attach
   [ -L "$P1/.workbench" ]
-  grep -qxF @.workbench/AGENTS.md "$P1/CLAUDE.local.md"
+  skills_linked "$P1"
   [ -z "$(git -C "$P1" status --porcelain)" ]
+}
+
+@test "повторное подключение убирает из CLAUDE.local.md блок прежней версии workbench" {
+  printf '\n<!-- workbench:attach begin: local lines, never commit them. Remove with: workbench detach -->\n@.workbench/AGENTS.md\n<!-- workbench:attach end -->\n' >>"$P1/CLAUDE.local.md"
+  echo "block CLAUDE.local.md" >>"$P1/.git/workbench-attach.state"
+  wb "$P1" attach
+  cmp "$P1/CLAUDE.local.md" "$SANDBOX/claude-local.orig"
 }

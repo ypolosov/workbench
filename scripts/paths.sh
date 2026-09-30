@@ -84,3 +84,23 @@ wb_unlink() {
     rm -f "$1"
   fi
 }
+
+wb_native_path() {
+  if wb_windows; then
+    cygpath -m "$1"
+  else
+    printf '%s\n' "$1"
+  fi
+}
+
+wb_import() {
+  printf '@%s\n' "$(wb_native_path "$1")" | sed 's/ /\\ /g'
+}
+
+wb_user_claude_md() {
+  printf '%s/CLAUDE.md\n' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+}
+
+wb_user_attached() {
+  grep -qxF "$(wb_import "$WB_DIR/AGENTS.md")" "$(wb_user_claude_md)" 2>/dev/null
+}

@@ -9,16 +9,18 @@ ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd -P)"
 
 # --- sandbox ----------------------------------------------------------------------
 
-# make_sandbox: exports SANDBOX, FPF_SRC, FPF_OLD, FPF_PINNED, FPF_NEWER, TPL, PRIVATE
-# and the git settings of the sandbox. Call it from setup_file.
+# make_sandbox: exports SANDBOX, FPF_SRC, FPF_OLD, FPF_PINNED, FPF_NEWER, TPL, PRIVATE,
+# the git settings and the home folder of the sandbox. Call it from setup_file.
 make_sandbox() {
   # Keep the caller's context out: variables of a surrounding git hook (GIT_DIR and
   # friends) and installer settings.
   # shellcheck disable=SC2046
   unset $(git rev-parse --local-env-vars) \
-    WORKBENCH_TEMPLATE WORKBENCH_REPO WORKBENCH_BASE WORKBENCH_NAME WORKBENCH_YES
+    WORKBENCH_TEMPLATE WORKBENCH_REPO WORKBENCH_BASE WORKBENCH_NAME WORKBENCH_YES \
+    CLAUDE_CONFIG_DIR
   SANDBOX="$(cd "$BATS_FILE_TMPDIR" && pwd -P)"
-  export SANDBOX
+  export SANDBOX HOME="$SANDBOX/home"
+  mkdir -p "$HOME"
   export GIT_CONFIG_GLOBAL="$SANDBOX/gitconfig" GIT_CONFIG_NOSYSTEM=1
   git config --global user.name "workbench test"
   git config --global user.email "test@example.invalid"
