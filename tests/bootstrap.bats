@@ -68,3 +68,13 @@ setup_file() {
   bootstrap "$BASE2" --bin-dir "$SANDBOX/bin2"
   grep -qxF "заметка с первой машины" "$BASE2/inbox/fleeting-notes.md"
 }
+
+@test "обновление шаблона подтягивается в базу с её собственными записями командой из подсказки" {
+  commit_note "$BASE" "своя запись в базе"
+  printf 'новое в шаблоне\n' >"$TPL/TEMPLATE-NEWS.md"
+  git -C "$TPL" add TEMPLATE-NEWS.md
+  git -C "$TPL" commit -qm "template: news"
+  git -C "$BASE" pull -q template main
+  [ -f "$BASE/TEMPLATE-NEWS.md" ]
+  grep -qxF "своя запись в базе" "$BASE/inbox/fleeting-notes.md"
+}

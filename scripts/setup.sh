@@ -35,8 +35,10 @@ printf 'gitdir: ../.git/worktrees/%s\n' "$worktree_id" >"$FPF_DIR/.git"
 current="$(git -C "$FPF_DIR" rev-parse HEAD)"
 [ "$current" = "$fpf_commit" ] || echo "WARN: .fpf is at $current, pinned edition is $fpf_commit" >&2
 
-# 2. Git hooks work for any agent and for a human.
+# 2. Git hooks work for any agent and for a human. Pulls merge: the base keeps its own
+#    history on top of the template's, and that history must never be rewritten.
 git -C "$WB_DIR" config core.hooksPath .githooks
+git -C "$WB_DIR" config pull.rebase false
 chmod +x "$WB_DIR"/adapters/claude/hooks/*.sh "$WB_DIR"/.githooks/* "$WB_DIR"/scripts/*.sh "$WB_DIR"/bin/*
 
 # 3. Sessions opened in the base itself keep Claude Code auto-memory here and get the
