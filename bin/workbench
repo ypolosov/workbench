@@ -9,10 +9,11 @@ usage() {
   cat <<EOF
 workbench - личная база этой машины: $WB_DIR
 
-  workbench attach --user       подключить инструкции и память базы ко всем проектам Claude Code
-                                на этой машине (блок в пользовательском CLAUDE.md)
-  workbench detach --user       убрать этот блок; свой текст файла остаётся
-  workbench attach [<проект>]   подключить хуки и скиллы базы к проекту (по умолчанию - к текущему)
+  workbench attach --user       подключить инструкции и память базы ко всем проектам этой машины:
+                                блоки в пользовательских CLAUDE.md (Claude Code) и AGENTS.md (Codex)
+  workbench detach --user       убрать эти блоки; свой текст файлов остаётся
+  workbench attach [<проект>]   подключить хуки и скиллы базы к проекту для Claude Code, Codex
+                                и Cursor (по умолчанию - к текущему)
   workbench detach [<проект>]   отключить базу от проекта; сама база остаётся
   workbench help                эта справка
 

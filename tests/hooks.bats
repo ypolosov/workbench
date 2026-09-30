@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# The Claude Code adapter's hooks, run the way Claude Code runs them: the command from
+# The hooks in Claude Code's protocol, run the way Claude Code runs them: the command from
 # the project's generated settings, through a shell, with CLAUDE_PROJECT_DIR.
 
 bats_require_minimum_version 1.5.0

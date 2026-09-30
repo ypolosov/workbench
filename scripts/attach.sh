@@ -1,16 +1,21 @@
 #!/bin/sh
-# Connects the personal base of this machine to Claude Code. On the user level, a marked
-# block in the user's CLAUDE.md imports the base's instructions and memory into every
-# project. In a project, .workbench becomes a link to the base, and Claude Code gets the
-# base's hooks and skills through local files. Nothing is committed into the project:
-# every path made there is listed in the project's .git/info/exclude and recorded in a
-# state file inside its git dir, so that detach removes exactly that.
+# Connects the personal base of this machine to AI agents: Claude Code, Codex and Cursor.
+# On the user level, a marked block in the user's CLAUDE.md imports the base's
+# instructions and memory into every Claude Code project, and a marked block in Codex's
+# user-level AGENTS.md points Codex to them (Codex has no imports). In a project,
+# .workbench becomes a link to the base, and the agents get the base's hooks, skills and a
+# pointer to its instructions through local files: Claude Code's settings.local.json
+# (Cursor runs these hooks too), Codex's hooks.json, Cursor's rule, and links to the
+# skills in .claude/skills (Claude Code) and .agents/skills (Codex, Cursor). Nothing is
+# committed into the project: every path made there is listed in the project's
+# .git/info/exclude and recorded in a state file inside its git dir, so that detach
+# removes exactly that. A file the project's git tracks belongs to its team and stays.
 #
 # Usage (normally through the workbench command):
 #   attach.sh [<folder>]            connect to the project of the folder (default: current)
 #   attach.sh --detach [<folder>]   remove exactly what attach made; the base stays
-#   attach.sh --user                import the base's instructions and memory on the user level
-#   attach.sh --detach --user       remove that import; the user's own lines stay
+#   attach.sh --user                point the agents to the base's instructions and memory
+#   attach.sh --detach --user       remove that; the user's own lines stay
 set -eu
 
 WB_DIR="$(cd "$(dirname "$0")/.." && pwd -P)"
@@ -19,9 +24,11 @@ WB_DIR="$(cd "$(dirname "$0")/.." && pwd -P)"
 
 MARK="workbench:attach"
 USER_MARK="workbench:user"
+# The hooks speak Claude Code's protocol; Codex speaks it too, Cursor translates it.
+ADAPTER=.workbench/adapters/claude/hooks
 # Expanded by the shell that runs each hook, not here.
 # shellcheck disable=SC2016
-HOOKS='$CLAUDE_PROJECT_DIR/.workbench/adapters/claude/hooks'
+CLAUDE_HOOK='"$CLAUDE_PROJECT_DIR/'"$ADAPTER"'/%s"'
 
 die() {
   echo "workbench: $*" >&2
@@ -75,6 +82,12 @@ $(wb_import "$WB_DIR/memory/MEMORY.md")
 EOF
 }
 
+codex_block() {
+  echo "<!-- $USER_MARK begin: lines of the workbench command. Remove with: workbench detach --user -->"
+  wb_read_note
+  echo "<!-- $USER_MARK end -->"
+}
+
 # strip_block <file> <mark>: removes the block of that mark and the empty line written
 # before it, so the owner's own text stays exactly as it was.
 strip_block() {
@@ -107,67 +120,125 @@ require_base_ready() {
   [ -d "$FPF_DIR" ] || die "база не подготовлена: запусти sh $WB_DIR/scripts/setup.sh"
 }
 
+# put_block <file> <block>: puts the block of this command at the end of the user's file
+# instead of the one there; the owner's own text and a link to the file stay.
+put_block() {
+  mkdir -p "$(dirname "$1")"
+  if [ -f "$1" ]; then strip_block "$1" "$USER_MARK"; fi
+  if [ -s "$1" ]; then echo >>"$1"; fi
+  printf '%s\n' "$2" >>"$1"
+}
+
+# drop_block <file>: removes the block of this command; a file left empty goes too.
+drop_block() {
+  grep -q "^<!-- $USER_MARK begin" "$1" 2>/dev/null || return 1
+  strip_block "$1" "$USER_MARK"
+  [ -L "$1" ] || [ -s "$1" ] || rm -f "$1"
+}
+
 attach_user() {
   require_base_ready
-  user_md="$(wb_user_claude_md)"
-  mkdir -p "$(dirname "$user_md")"
-  if [ -f "$user_md" ]; then strip_block "$user_md" "$USER_MARK"; fi
-  if [ -s "$user_md" ]; then echo >>"$user_md"; fi
-  user_block >>"$user_md"
-  echo "workbench: инструкции и память базы подключены ко всем проектам Claude Code на этой машине: $user_md"
+  put_block "$(wb_user_claude_md)" "$(user_block)"
+  echo "workbench: инструкции и память базы подключены ко всем проектам Claude Code на этой машине: $(wb_user_claude_md)"
+  put_block "$(wb_codex_agents_md)" "$(codex_block)"
+  echo "workbench: Codex на этой машине знает, где инструкции и память базы: $(wb_codex_agents_md)"
 }
 
 detach_user() {
-  user_md="$(wb_user_claude_md)"
-  grep -q "^<!-- $USER_MARK begin" "$user_md" 2>/dev/null ||
-    die "инструкции и память базы не подключены на уровне пользователя: в $user_md нет блока workbench"
-  strip_block "$user_md" "$USER_MARK"
-  [ -L "$user_md" ] || [ -s "$user_md" ] || rm -f "$user_md"
-  echo "workbench: инструкции и память базы отключены на уровне пользователя: $user_md"
-}
-
-# Hooks of the Claude Code adapter plus the owner's optional overlay.
-settings_json() {
-  wb_with_overlay "$(wb_hooks_json "$HOOKS")"
-}
-
-# Creates .claude/settings.local.json, or merges into an existing one after a backup.
-write_settings() {
-  settings_file="$TARGET/.claude/settings.local.json"
-  if [ ! -d "$TARGET/.claude" ]; then
-    mkdir "$TARGET/.claude"
-    record created-dir .claude
-  fi
-  ours="$(settings_json)"
-  if [ -f "$settings_file" ]; then
-    cp "$settings_file" "$settings_file.wb-backup"
-    record backup .claude/settings.local.json
-    # Merge into a temporary file: the project's own file changes only on success.
-    if ! printf '%s' "$ours" | jq -s "$MERGE_JQ" "$settings_file.wb-backup" - >"$settings_file.wb-tmp"; then
-      rm -f "$settings_file.wb-tmp"
-      die "cannot merge into $settings_file (left unchanged; run workbench detach to clean up)"
+  removed=0
+  for user_file in "$(wb_user_claude_md)" "$(wb_codex_agents_md)"; do
+    if drop_block "$user_file"; then
+      echo "workbench: инструкции и память базы отключены на уровне пользователя: $user_file"
+      removed=1
     fi
-    mv "$settings_file.wb-tmp" "$settings_file"
+  done
+  [ "$removed" = 1 ] ||
+    die "инструкции и память базы не подключены на уровне пользователя: нет блока workbench ни в $(wb_user_claude_md), ни в $(wb_codex_agents_md)"
+}
+
+# ensure_dir <folder>: makes the project's folder and every missing parent, recording them.
+ensure_dir() {
+  made=""
+  old_ifs=$IFS
+  IFS=/
+  set -f
+  for part in $1; do
+    made="${made:+$made/}$part"
+    if [ ! -d "$TARGET/$made" ]; then
+      mkdir "$TARGET/$made"
+      record created-dir "$made"
+    fi
+  done
+  set +f
+  IFS=$old_ifs
+}
+
+# tracked <file>: the project's git tracks the file, so it belongs to the project's team.
+tracked() {
+  git -C "$TARGET" ls-files --error-unmatch -- "$1" >/dev/null 2>&1
+}
+
+# merge_json <file> <json>: creates the project's local file, or merges into an existing
+# one after a backup; the project's own file changes only when the merge succeeds.
+merge_json() {
+  if tracked "$1"; then
+    echo "workbench: $1 хранится в git проекта, и его я не трогаю: этот агент остаётся без хуков workbench" >&2
+    return 0
+  fi
+  ensure_dir "$(dirname "$1")"
+  json_file="$TARGET/$1"
+  if [ -f "$json_file" ]; then
+    cp "$json_file" "$json_file.wb-backup"
+    record backup "$1"
+    if ! printf '%s' "$2" | jq -s "$MERGE_JQ" "$json_file.wb-backup" - >"$json_file.wb-tmp"; then
+      rm -f "$json_file.wb-tmp"
+      die "cannot merge into $json_file (left unchanged; run workbench detach to clean up)"
+    fi
+    mv "$json_file.wb-tmp" "$json_file"
   else
-    printf '%s\n' "$ours" >"$settings_file"
-    record created .claude/settings.local.json
+    printf '%s\n' "$2" >"$json_file"
+    record created "$1"
   fi
 }
 
-link_skills() {
-  if [ ! -d "$TARGET/.claude/skills" ]; then
-    mkdir "$TARGET/.claude/skills"
-    record created-dir .claude/skills
+# Claude Code: its hooks plus the owner's optional overlay. Cursor runs these hooks too.
+claude_settings() {
+  wb_with_overlay "$(wb_hooks_json "$CLAUDE_HOOK")"
+}
+
+codex_hooks() {
+  wb_hooks_json "$(wb_codex_hook_command "$ADAPTER")" '^Bash$'
+}
+
+# Cursor: a rule in force in every session that points the agent to the base.
+write_cursor_rule() {
+  rule=.cursor/rules/workbench.mdc
+  if [ -e "$TARGET/$rule" ]; then
+    echo "workbench: $rule в проекте уже есть, его я не трогаю" >&2
+    return 0
   fi
+  ensure_dir .cursor/rules
+  {
+    printf -- '---\ndescription: workbench - личная база владельца этой машины\nalwaysApply: true\n---\n\n'
+    echo "<!-- workbench: local file made by workbench attach, never commit it. Remove with: workbench detach -->"
+    wb_read_note
+  } >"$TARGET/$rule"
+  record created "$rule"
+}
+
+# link_skills <folder>: links each skill of the base into the folder of the project; its
+# own skills stay, a skill of the same name included.
+link_skills() {
+  ensure_dir "$1"
   for skill in "$WB_DIR"/.agents/skills/*/; do
     name="$(basename "$skill")"
-    skill_link="$TARGET/.claude/skills/$name"
+    skill_link="$TARGET/$1/$name"
     if [ -e "$skill_link" ] || [ -L "$skill_link" ]; then
-      echo "workbench: скилл $name в проекте уже есть, пропускаю" >&2
+      echo "workbench: скилл $name в $1 проекта уже есть, пропускаю" >&2
       continue
     fi
     wb_link "../../.workbench/.agents/skills/$name" "$skill_link"
-    record link ".claude/skills/$name"
+    record link "$1/$name"
   done
 }
 
@@ -175,7 +246,7 @@ write_exclude() {
   {
     echo "# $MARK begin"
     grep -E '^(link|created|created-dir|backup) ' "$STATE" | sed 's#^[^ ]* #/#'
-    if grep -q '^backup ' "$STATE"; then echo "/.claude/settings.local.json.wb-backup"; fi
+    grep '^backup ' "$STATE" | sed 's#^backup \(.*\)$#/\1.wb-backup#'
     echo "# $MARK end"
   } >>"$EXCLUDE"
 }
@@ -186,14 +257,15 @@ devcontainer_hint() {
     [ -f "$config" ] || continue
     echo "workbench: в контейнере база видна, только если смонтировать её по тому же пути. Добавь в \"mounts\" файла $config:"
     printf '  {"source": "%s", "target": "%s", "type": "bind"}\n' "$WB_DIR" "$WB_DIR"
-    printf 'workbench: у Claude Code в контейнере бывает своя папка настроек; тогда подключи там инструкции и память базы командой  sh "%s/bin/workbench" attach --user\n' "$WB_DIR"
+    printf 'workbench: у агентов в контейнере бывает своя папка настроек; тогда подключи там инструкции и память базы командой  sh "%s/bin/workbench" attach --user\n' "$WB_DIR"
     return 0
   done
 }
 
 user_hint() {
-  wb_user_attached ||
-    echo "workbench: инструкции и память базы Claude Code берёт из $(wb_user_claude_md), а там их пока нет. Подключи их один раз на этой машине: workbench attach --user"
+  if ! wb_user_attached || ! wb_codex_attached; then
+    echo "workbench: инструкции и память базы на уровне пользователя подключены не для всех агентов (Claude Code: $(wb_user_claude_md), Codex: $(wb_codex_agents_md)). Подключи их один раз на этой машине: workbench attach --user"
+  fi
 }
 
 attach() {
@@ -201,10 +273,13 @@ attach() {
   mkdir -p "$(dirname "$EXCLUDE")"
   : >"$STATE"
   link_base
-  write_settings
-  link_skills
+  merge_json .claude/settings.local.json "$(claude_settings)"
+  merge_json .codex/hooks.json "$(codex_hooks)"
+  write_cursor_rule
+  link_skills .claude/skills
+  link_skills .agents/skills
   write_exclude
-  echo "workbench: подключено к $TARGET (.workbench -> $WB_DIR)"
+  echo "workbench: подключено к $TARGET (.workbench -> $WB_DIR) для Claude Code, Codex и Cursor"
   user_hint
   devcontainer_hint
 }
@@ -241,7 +316,7 @@ case "${1:-}" in
     fi
     ;;
   -h | --help)
-    sed -n '2,13p' "$0"
+    awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"
     ;;
   *)
     use_target "${1:-}"

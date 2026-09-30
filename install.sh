@@ -7,8 +7,9 @@
 # The base is the only local clone of the owner's private repository on this machine;
 # when that repository is empty or missing, it is created from the public template.
 # Running the installer again for the same folder updates the base. Afterwards,
-# `workbench attach --user` imports the base's instructions and memory into every Claude
-# Code project, and `workbench attach` in a project's folder adds the base's hooks and skills.
+# `workbench attach --user` points Claude Code and Codex to the base's instructions and
+# memory in every project, and `workbench attach` in a project's folder adds the base's
+# hooks and skills for Claude Code, Codex and Cursor.
 set -eu
 
 TEMPLATE="${WORKBENCH_TEMPLATE:-https://github.com/ypolosov/workbench.git}"
@@ -255,7 +256,7 @@ main() {
 workbench: готово.
   Личная база: $DIR ($(git -C "$DIR" remote get-url origin))
   Команда: $BIN_DIR/workbench
-  Инструкции и память базы во все проекты Claude Code:  workbench attach --user
+  Инструкции и память базы во все проекты (Claude Code, Codex):  workbench attach --user
   Хуки и скиллы базы в проект: в папке проекта  workbench attach
   Маркеры компании для проверки перед сохранением: $(git -C "$DIR" rev-parse --absolute-git-dir)/info/company-markers
   Обновления шаблона: git -C $DIR pull template main

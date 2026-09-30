@@ -41,6 +41,17 @@ allowed() {
   }
 }
 
+# core_guard <command>: the guard's core, which every agent's adapter feeds with plain text.
+core_guard() {
+  printf '%s\n' "$1" | sh "$ROOT/scripts/guard.sh"
+}
+
+@test "ядро защиты получает команду простым текстом: переходник любого агента передаёт её как есть" {
+  run -2 core_guard "git add -A"
+  [[ $output == *"git add -A"* ]]
+  run -0 core_guard "git status"
+}
+
 @test "блокирует добавление всех файлов разом" {
   blocked "git add -A" "git add --all" "git add -u" "git add ." "git -C /work/project add -A" \
     "git status && git add ." "echo x; git add -A" 'x=$(git add -A)'

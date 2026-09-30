@@ -1,11 +1,16 @@
 #!/bin/sh
-# WP gate reminder (UserPromptSubmit). Adapted from FMT-exocortex-template
-# .claude/hooks/wp-gate-reminder.sh (MIT, Tseren Tserenov): platform-specific
-# Day Open branch removed, text points to the workbench registry.
+# WP gate reminder (UserPromptSubmit) in the Claude Code hook protocol: Codex uses it as it
+# is, and Cursor runs it from the project's Claude Code settings. Adapted from
+# FMT-exocortex-template .claude/hooks/wp-gate-reminder.sh (MIT, Tseren Tserenov):
+# platform-specific Day Open branch removed, text points to the workbench registry.
 # Read-only: returns additionalContext JSON only.
 
 cat >/dev/null
-ROOT="$(cd "$(dirname "$0")/../../.." && pwd -P)"
-CTX="РП: новую задачу свяжи с РП из ${ROOT}/docs/WP-REGISTRY.md (нет подходящего - принять, отложить, отклонить или вернуть, OPS.5). Продолжение того же РП - продолжай. Вопрос без изменения файлов РП не требует."
-jq -n --arg ctx "$CTX" '{"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": $ctx}}'
+WB_DIR="$(cd "$(dirname "$0")/../../.." && pwd -P)"
+# shellcheck source=../../../scripts/paths.sh
+. "$WB_DIR/scripts/paths.sh"
+# shellcheck source=../../../scripts/hooks.sh
+. "$WB_DIR/scripts/hooks.sh"
+
+jq -n --arg ctx "$(wb_wp_reminder)" '{"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": $ctx}}'
 exit 0

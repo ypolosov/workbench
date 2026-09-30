@@ -1,7 +1,7 @@
 #!/bin/sh
 # Prepares the personal base of this machine: the pinned FPF worktree in .fpf, git hooks
-# and the local Claude Code files for sessions opened in the base itself. install.sh runs
-# it; running it again is safe.
+# and the local agent files for sessions opened in the base itself (Claude Code and
+# Cursor read .claude, Codex reads .codex). install.sh runs it; running it again is safe.
 set -eu
 
 WB_DIR="$(cd "$(dirname "$0")/.." && pwd -P)"
@@ -42,19 +42,27 @@ git -C "$WB_DIR" config pull.rebase false
 chmod +x "$WB_DIR"/adapters/claude/hooks/*.sh "$WB_DIR"/.githooks/* "$WB_DIR"/scripts/*.sh "$WB_DIR"/bin/*
 
 # 3. Sessions opened in the base itself keep Claude Code auto-memory here and get the
-#    adapter's hooks and the personal overlay. All of it is local: autoMemoryDirectory
-#    is ignored in a committed settings.json.
-mkdir -p "$WB_DIR/.claude"
+#    adapter's hooks and the personal overlay; Cursor runs the same hooks, and Codex gets
+#    them in its own file. All of it is local: autoMemoryDirectory is ignored in a
+#    committed settings.json.
+mkdir -p "$WB_DIR/.claude" "$WB_DIR/.codex"
 local_settings="$WB_DIR/.claude/settings.local.json"
 # Expanded by the shell that runs each hook, not here.
 # shellcheck disable=SC2016
-hooks="$(wb_hooks_json '$CLAUDE_PROJECT_DIR/adapters/claude/hooks')"
+hooks="$(wb_hooks_json '"$CLAUDE_PROJECT_DIR/adapters/claude/hooks/%s"')"
 settings="$(printf '%s\n%s\n' "$(jq -n --arg dir "$WB_DIR/memory" '{autoMemoryDirectory: $dir}')" "$hooks" | jq -s "$MERGE_JQ")"
 if [ -f "$local_settings" ]; then
   settings="$(printf '%s' "$settings" | jq -s "$MERGE_JQ" "$local_settings" -)"
 fi
 wb_with_overlay "$settings" >"$local_settings.tmp"
 mv "$local_settings.tmp" "$local_settings"
+codex_hooks="$WB_DIR/.codex/hooks.json"
+settings="$(wb_hooks_json "$(wb_codex_hook_command adapters/claude/hooks)" '^Bash$')"
+if [ -f "$codex_hooks" ]; then
+  settings="$(printf '%s' "$settings" | jq -s "$MERGE_JQ" "$codex_hooks" -)"
+fi
+printf '%s\n' "$settings" >"$codex_hooks.tmp"
+mv "$codex_hooks.tmp" "$codex_hooks"
 
 # 4. Company markers for the pre-commit check: local list, never committed.
 markers="$(git -C "$WB_DIR" rev-parse --absolute-git-dir)/info/company-markers"

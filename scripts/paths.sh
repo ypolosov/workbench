@@ -27,18 +27,29 @@ wb_fpf_edition() {
   sed -n "s/^$1=//p" "$WB_DIR/.fpf-edition" | tail -n 1
 }
 
-# Prints the Claude Code hooks of the adapter. $1 is the hooks directory the way the
-# hook commands name it, e.g. '$CLAUDE_PROJECT_DIR/.workbench/adapters/claude/hooks'.
+# wb_hooks_json <command> [<shell matcher>]: the hooks of the adapter in the format that
+# Claude Code and Codex share. In the command, %s stands for a hook script name, e.g.
+# '"$CLAUDE_PROJECT_DIR/.workbench/adapters/claude/hooks/%s"'. The matcher names the shell
+# tool: Bash for Claude Code, ^Bash$ for Codex, whose matchers are regular expressions.
 wb_hooks_json() {
-  jq -n --arg h "$1" '
-    def cmd(name): {type: "command", command: ("\"" + $h + "/" + name + "\"")};
+  jq -n --arg c "$1" --arg m "${2:-Bash}" '
+    def cmd(name): {type: "command", command: ($c | sub("%s"; name))};
     {
       hooks: {
         SessionStart: [{hooks: [cmd("session-start.sh")]}],
         UserPromptSubmit: [{hooks: [cmd("wp-gate-reminder.sh"), cmd("close-gate-reminder.sh")]}],
-        PreToolUse: [{matcher: "Bash", hooks: [cmd("destructive-guard.sh")]}]
+        PreToolUse: [{matcher: $m, hooks: [cmd("destructive-guard.sh")]}]
       }
     }'
+}
+
+# The Codex hook command for a hook script under the adapter folder $1 of the repository
+# root: Codex runs hooks in the session folder, which can be a subfolder, and has no
+# variable for the project; WB_AGENT tells the shared hooks which agent they talk to.
+wb_codex_hook_command() {
+  # Expanded by the shell that runs each hook, not here.
+  # shellcheck disable=SC2016
+  printf 'WB_AGENT=codex sh "$(git rev-parse --show-toplevel)/%s/%%s"\n' "$1"
 }
 
 # Prints the JSON document $1 merged with the personal overlay, when there is one.
@@ -103,4 +114,26 @@ wb_user_claude_md() {
 
 wb_user_attached() {
   grep -qxF "$(wb_import "$WB_DIR/AGENTS.md")" "$(wb_user_claude_md)" 2>/dev/null
+}
+
+# The user-level instructions of Codex: AGENTS.md in CODEX_HOME, ~/.codex by default.
+wb_codex_agents_md() {
+  printf '%s/AGENTS.md\n' "${CODEX_HOME:-$HOME/.codex}"
+}
+
+# Codex has no imports: its user-level file names this base's files for the agent to read.
+wb_codex_attached() {
+  grep -qF "$(wb_native_path "$WB_DIR/AGENTS.md")" "$(wb_codex_agents_md)" 2>/dev/null
+}
+
+# wb_read_note: the lines that point an agent without imports (Codex, Cursor) to the base.
+wb_read_note() {
+  cat <<EOF
+# Подключён workbench
+
+- \$WORKBENCH = $(wb_native_path "$WB_DIR") (личная база этой машины)
+- \$FPF = $(wb_native_path "$FPF_DIR") (закреплённое издание FPF)
+
+В начале каждой сессии прочитай целиком и выполняй инструкции workbench $(wb_native_path "$WB_DIR/AGENTS.md") и прочитай индекс личной памяти владельца $(wb_native_path "$WB_DIR/memory/MEMORY.md") (файлы памяти лежат рядом с индексом).
+EOF
 }

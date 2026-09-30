@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # The private base opened on its own, e.g. ~/DEV/GITS/my-workbench: setup.sh connects
-# Claude Code to the clone itself with local files that git ignores.
+# Claude Code, Cursor and Codex to the clone itself with local files that git ignores.
 
 bats_require_minimum_version 1.5.0
 load helpers
@@ -18,6 +18,12 @@ setup_file() {
 @test "начало сессии в самой базе указывает на неё" {
   ctx="$(session_context "$BASE")"
   [[ $ctx == *"\$WORKBENCH = $BASE"* ]]
+}
+
+@test "Codex в самой базе получает хуки базы" {
+  jq -e '.hooks.PreToolUse[0].matcher == "^Bash$"' "$BASE/.codex/hooks.json"
+  out="$(codex_hook "$BASE" session-start.sh "$(session_input "$BASE")")"
+  [[ $(context_of "$out") == *"\$WORKBENCH = $BASE"* ]]
 }
 
 @test "скиллы базы доступны" {

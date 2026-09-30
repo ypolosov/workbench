@@ -107,6 +107,30 @@ hook_from() {
   (cd "$2" && printf '%s' "$4" | CLAUDE_PROJECT_DIR="$2" sh -c "$cmd")
 }
 
+# codex_hook <project> <script> <json> [<folder>]: runs a hook command from the project's
+# Codex hooks the way Codex does: through a shell in the session folder (by default the
+# project), without CLAUDE_PROJECT_DIR.
+codex_hook() {
+  local cmd
+  cmd="$(jq -r --arg s "$2" '[.. | objects | .command? | strings | select(contains("/" + $s))][0] // empty' "$1/.codex/hooks.json")"
+  [ -n "$cmd" ] || return 90
+  (cd "${4:-$1}" && unset CLAUDE_PROJECT_DIR && printf '%s' "$3" | sh -c "$cmd")
+}
+
+# cursor_hook <project> <script> <json>: runs a hook command from the project's Claude Code
+# settings the way Cursor does: it reads them as third-party hooks and sets
+# CURSOR_PROJECT_DIR next to CLAUDE_PROJECT_DIR.
+cursor_hook() {
+  local cmd
+  cmd="$(jq -r --arg s "$2" '[.. | objects | .command? | strings | select(contains("/" + $s))][0] // empty' "$1/.claude/settings.local.json")"
+  [ -n "$cmd" ] || return 90
+  (cd "$1" && printf '%s' "$3" | CURSOR_PROJECT_DIR="$1" CLAUDE_PROJECT_DIR="$1" sh -c "$cmd")
+}
+
+cursor_session_input() {
+  jq -n --arg root "$1" '{hook_event_name: "sessionStart", cursor_version: "3.10.20", workspace_roots: [$root]}'
+}
+
 # context_of <hook output>: the additionalContext the hook returned.
 context_of() {
   printf '%s' "$1" | jq -r '.hookSpecificOutput.additionalContext // empty' 2>/dev/null || true
