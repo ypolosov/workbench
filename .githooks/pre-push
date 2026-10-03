@@ -1,22 +1,21 @@
 #!/bin/sh
-# Blocks non-fast-forward pushes, so that no agent overwrites the shared history of
-# the personal base. Adapted from FMT-exocortex-template .githooks/pre-push (MIT,
-# Tseren Tserenov). Override, only by the owner: ALLOW_FORCE_PUSH=1 git push --force
+# The shared history of the personal base is never rewritten: a push that would drop
+# commits the remote repository already has is refused. New branches and deletions go
+# through. Only the owner overrides it, and only explicitly:
+#   ALLOW_FORCE_PUSH=1 git push --force
 set -u
 
-[ -n "${ALLOW_FORCE_PUSH:-}" ] && exit 0
+[ -z "${ALLOW_FORCE_PUSH:-}" ] || exit 0
 
-zero=0000000000000000000000000000000000000000
+refused=0
 while read -r _ local_sha remote_ref remote_sha; do
-  [ "$local_sha" = "$zero" ] && continue
-  [ "$remote_sha" = "$zero" ] && continue
-  if ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
-    echo ""
-    echo "Push blocked: $remote_ref is not a fast-forward."
-    echo "   This overwrites history and may destroy parallel agent work."
-    echo "   Override (if authorized): ALLOW_FORCE_PUSH=1 git push --force"
-    exit 1
-  fi
+  # An all-zero object name stands for a branch that is deleted or does not exist yet.
+  case $local_sha in *[!0]*) ;; *) continue ;; esac
+  case $remote_sha in *[!0]*) ;; *) continue ;; esac
+  # The remote tip must stay part of the pushed history.
+  git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null && continue
+  echo "workbench: отправка в $remote_ref отклонена: она перезаписала бы историю, которую уже видят другие копии базы." >&2
+  echo "workbench: сначала git pull (слияние), потом git push. Перезаписать может только владелец, явно: ALLOW_FORCE_PUSH=1 git push --force" >&2
+  refused=1
 done
-
-exit 0
+exit "$refused"

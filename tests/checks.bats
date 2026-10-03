@@ -34,3 +34,8 @@ setup_file() {
   run ! git -C "$BASE" push -q --force origin HEAD:main
   [ "$(git -C "$PRIVATE" rev-parse main)" = "$pushed" ]
 }
+
+@test "владелец перезаписывает историю только явно, с ALLOW_FORCE_PUSH=1" {
+  ALLOW_FORCE_PUSH=1 git -C "$BASE" push -q --force origin HEAD:main
+  [ "$(git -C "$PRIVATE" rev-parse main)" = "$(git -C "$BASE" rev-parse HEAD)" ]
+}

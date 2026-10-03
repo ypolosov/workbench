@@ -67,7 +67,8 @@ wb_session_context() {
   pinned="$(wb_fpf_edition commit)"
   if fpf_rev="$(git -C "$FPF_DIR" rev-parse HEAD 2>/dev/null)"; then
     fpf_line="\$FPF = ${FPF_DIR} (издание $(printf '%.7s' "$fpf_rev"))"
-    [ "$fpf_rev" = "$pinned" ] || fpf_line="${fpf_line}; ВНИМАНИЕ: закреплено издание $(printf '%.7s' "$pinned")"
+    [ "$fpf_rev" = "$pinned" ] ||
+      fpf_line="${fpf_line}; ВНИМАНИЕ: закреплено издание $(printf '%.7s' "$pinned"), рабочую копию на него переводит sh ${WB_DIR}/scripts/setup.sh"
   else
     fpf_line="\$FPF не подготовлен: запусти ${WB_DIR}/scripts/setup.sh"
   fi
@@ -98,6 +99,22 @@ ${active}
 Правило допуска: свяжи задачу с РП и назови его ("Работаю по РП N: ..."). Подходящего нет - предложи принять, отложить, отклонить или вернуть (OPS.5); новый РП заводи скиллом wp-new только после явного "да".
 Граница: в \$WORKBENCH пишется только личное (РП, личные решения, факты о владельце). Код, данные и факты целевого проекта - только в сам проект или во встроенную память агента для этого проекта, никогда в \$WORKBENCH.
 EOF
+}
+
+# wb_prompt: the owner's message taken from the hook input on stdin. Line breaks that an
+# agent leaves raw inside the JSON string would make it invalid, so they count as spaces.
+wb_prompt() {
+  LC_ALL=C tr '\n\r\t' '   ' | jq -r '.prompt // empty' 2>/dev/null
+}
+
+# wb_prompt_answer <text>: the answer of a UserPromptSubmit hook in Claude Code's protocol:
+# the text as context for the agent, or an empty object when there is nothing to add.
+wb_prompt_answer() {
+  if [ -n "$1" ]; then
+    jq -n --arg ctx "$1" '{hookSpecificOutput: {hookEventName: "UserPromptSubmit", additionalContext: $ctx}}'
+  else
+    echo '{}'
+  fi
 }
 
 wb_wp_reminder() {

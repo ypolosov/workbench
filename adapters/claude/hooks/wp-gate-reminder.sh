@@ -1,16 +1,13 @@
 #!/bin/sh
-# WP gate reminder (UserPromptSubmit) in the Claude Code hook protocol: Codex uses it as it
-# is, and Cursor runs it from the project's Claude Code settings. Adapted from
-# FMT-exocortex-template .claude/hooks/wp-gate-reminder.sh (MIT, Tseren Tserenov):
-# platform-specific Day Open branch removed, text points to the workbench registry.
-# Read-only: returns additionalContext JSON only.
+# UserPromptSubmit hook in Claude Code's protocol; Codex takes it as it is, and Cursor runs
+# it from the project's Claude Code settings. On every message of the owner it reminds the
+# agent to admit the work against the registry of work products (OPS.5). Read-only.
 
-cat >/dev/null
 WB_DIR="$(cd "$(dirname "$0")/../../.." && pwd -P)"
 # shellcheck source=../../../scripts/paths.sh
 . "$WB_DIR/scripts/paths.sh"
 # shellcheck source=../../../scripts/hooks.sh
 . "$WB_DIR/scripts/hooks.sh"
 
-jq -n --arg ctx "$(wb_wp_reminder)" '{"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": $ctx}}'
-exit 0
+cat >/dev/null
+wb_prompt_answer "$(wb_wp_reminder)"

@@ -43,6 +43,13 @@ setup_file() {
   [[ $ctx == *close-session* ]]
 }
 
+@test "закрывай в многострочном сообщении вызывает скилл закрытия, даже с переводом строки прямо в JSON" {
+  ctx="$(prompt_context "$P1" close-gate-reminder.sh "$(printf 'готово\nзакрывай')")"
+  [[ $ctx == *close-session* ]]
+  raw="$(printf '{"hook_event_name": "UserPromptSubmit", "prompt": "готово\n\tзакрывай", "cwd": "%s"}' "$P1")"
+  [[ $(context_of "$(hook "$P1" close-gate-reminder.sh "$raw")") == *close-session* ]]
+}
+
 @test "обычное сообщение закрытие не вызывает" {
   run -0 hook "$P1" close-gate-reminder.sh "$(prompt_input "$P1" "покажи статус")"
   [ "$output" = "{}" ]

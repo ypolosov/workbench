@@ -7,34 +7,6 @@
 - Использование: без изменений, рабочей копией git `.fpf` на издании из `.fpf-edition`; в историю workbench не входит.
 - Абзац о подключении FPF в `AGENTS.md` (раздел 1) процитирован из FPF `Readme.md`; путь `fpf/` заменён на `$FPF`, как предлагает сам Readme.
 
-## FMT-exocortex-template (IWE)
+## Благодарность
 
-- Автор: Tseren Tserenov. Источник: https://github.com/TserenTserenov/FMT-exocortex-template
-- Лицензия: MIT (текст ниже).
-- Взято с одной правкой: значки вердикта и другие символы вне клавиатуры заменены словами и знаками ASCII: `.agents/skills/vdv/SKILL.md`, `.agents/skills/vdv/test_cases.md`.
-- Адаптировано и переведено на POSIX sh: `.githooks/pre-push`, `adapters/claude/hooks/wp-gate-reminder.sh`, `adapters/claude/hooks/close-gate-reminder.sh`.
-- По мотивам (новые тексты и код): правила в `AGENTS.md`, скиллы `wp-new` и `close-session`, соглашение "один РП - одна папка", правила защиты `adapters/claude/hooks/destructive-guard.sh` (переписана заново на POSIX sh и awk).
-
-### Текст лицензии MIT
-
-    MIT License
-    
-    Copyright (c) 2026 Tseren Tserenov
-    
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
-    
-    The above copyright notice and this permission notice shall be included in all
-    copies or substantial portions of the Software.
-    
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-    SOFTWARE.
+Учёт рабочих продуктов, напоминания агенту и защиту от опасных команд владелец впервые опробовал в шаблоне FMT-exocortex-template (IWE, автор Tseren Tserenov, https://github.com/TserenTserenov/FMT-exocortex-template). Из него в workbench перешли только идеи: файлов шаблона здесь нет, код и тексты написаны заново, правила практики опираются на паттерны FPF.

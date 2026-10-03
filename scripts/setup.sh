@@ -32,8 +32,16 @@ fi
 git -C "$WB_DIR" worktree repair "$FPF_DIR" >/dev/null 2>&1 || echo "WARN: git worktree repair failed for .fpf" >&2
 worktree_id="$(basename "$(git -C "$FPF_DIR" rev-parse --absolute-git-dir)")"
 printf 'gitdir: ../.git/worktrees/%s\n' "$worktree_id" >"$FPF_DIR/.git"
+# A base that took a template update with another pinned edition moves .fpf to it; a
+# worktree with local changes stays where it is, so nothing in it is lost.
 current="$(git -C "$FPF_DIR" rev-parse HEAD)"
-[ "$current" = "$fpf_commit" ] || echo "WARN: .fpf is at $current, pinned edition is $fpf_commit" >&2
+if [ "$current" != "$fpf_commit" ]; then
+  if git -C "$FPF_DIR" checkout -q --detach "$fpf_commit"; then
+    echo "workbench: FPF переведён на закреплённое издание $(git -C "$FPF_DIR" rev-parse --short HEAD)"
+  else
+    echo "WARN: .fpf is at $current, pinned edition is $fpf_commit" >&2
+  fi
+fi
 
 # 2. Git hooks work for any agent and for a human. Pulls merge: the base keeps its own
 #    history on top of the template's, and that history must never be rewritten.

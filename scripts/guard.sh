@@ -7,8 +7,6 @@
 # git clean -f without a dry run, rm -r -f outside temporary directories, gh repo
 # delete, and a top-level cd (Claude Code keeps the working directory between calls).
 # Quoted text, comments and heredoc bodies are data, unless a shell reads the heredoc.
-# The rules follow the destructive-guard hook of FMT-exocortex-template (MIT, Tseren
-# Tserenov); this is a shorter rewrite in POSIX sh and awk.
 set -u
 
 block() {
