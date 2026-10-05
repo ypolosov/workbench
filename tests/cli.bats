@@ -112,3 +112,20 @@ setup_file() {
   run -0 wb "$SANDBOX/p-dc-other" attach
   [[ $output == *"в контейнере база видна"* ]]
 }
+
+@test "workbench.cmd лежит рядом с командой и хранится с концами строк CRLF, как ждёт cmd.exe" {
+  [ -f "$BASE/bin/workbench.cmd" ]
+  [ "$(git -C "$BASE" check-attr eol -- bin/workbench.cmd)" = "bin/workbench.cmd: eol: crlf" ]
+  grep -q 'bin\\sh.exe' "$BASE/bin/workbench.cmd"
+}
+
+@test "workbench.cmd из cmd.exe: справка и подключение проекта" {
+  if ! on_windows; then skip "только Windows"; fi
+  new_project "$SANDBOX/p-cmd"
+  cmd_file="$(cygpath -w "$BASE/bin/workbench.cmd")"
+  run -0 env MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' cmd /c "$cmd_file" help
+  [[ $output == *"attach --user"* ]]
+  (cd "$SANDBOX/p-cmd" && MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' cmd /c "$cmd_file" attach)
+  [ -f "$SANDBOX/p-cmd/.workbench/AGENTS.md" ]
+  run -1 env MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' cmd /c "$cmd_file" frobnicate
+}

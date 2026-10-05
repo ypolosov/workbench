@@ -206,8 +206,13 @@ claude_settings() {
   wb_with_overlay "$(wb_hooks_json "$CLAUDE_HOOK")"
 }
 
+# On Windows, Codex runs the hooks through cmd.exe: they get a commandWindows of their own.
 codex_hooks() {
-  wb_hooks_json "$(wb_codex_hook_command "$ADAPTER")" '^Bash$'
+  windows_command=""
+  if wb_windows; then
+    windows_command="$(wb_codex_windows_hook_command "$(wb_git_sh)" "$(wb_native_path "$TARGET")" "$ADAPTER")"
+  fi
+  wb_hooks_json "$(wb_codex_hook_command "$ADAPTER")" '^Bash$' "$windows_command"
 }
 
 # Cursor: a rule in force in every session that points the agent to the base.

@@ -27,6 +27,21 @@ curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh 
 
 Повторный запуск для той же папки обновляет базу. Все параметры: `curl -fsSL .../install.sh | sh -s -- --help`. Нужны `git`, `sh`, `jq`. Windows - в Git Bash (ставится вместе с Git for Windows) или в WSL; Linux и macOS - в обычном терминале.
 
+### Windows: cmd и PowerShell
+
+Обязательная зависимость - Git for Windows: весь код на sh и выполняется его `bin\sh.exe`. Установка - в Git Bash, а пользоваться командой и агентами можно из cmd, PowerShell и Git Bash:
+
+- `bin\workbench.cmd` в папке базы вызывает ту же команду через `sh.exe` Git. Чтобы `workbench` работала из любой папки, добавь папку `bin` базы в PATH пользователя, один раз, в PowerShell:
+
+  ```powershell
+  $p = [Environment]::GetEnvironmentVariable('Path', 'User')
+  [Environment]::SetEnvironmentVariable('Path', "$p;$HOME\my-workbench\bin", 'User')
+  ```
+
+  Новые окна cmd, PowerShell и Git Bash увидят команду. `jq` тоже должен быть в PATH (например, `winget install jqlang.jq`).
+- Claude Code в Windows выполняет хуки через Git Bash, из какой бы оболочки его ни запустили, поэтому его хуки те же, что в Linux.
+- Codex в Windows выполняет хуки через `cmd.exe`, а не через sh. Поэтому `attach` в Windows пишет каждому хуку Codex ещё и `commandWindows`: абсолютный путь к `bin\sh.exe` Git (берётся при `attach`) и абсолютный путь к проекту. Переехал Git или проект - повтори `workbench attach`. После `attach` хуки Codex надо одобрить заново.
+
 ## Подключение
 
 Инструкции и память базы - один раз на машине, в любой папке:
@@ -64,7 +79,7 @@ workbench detach    # отключить; сама база остаётся
 
 Первый запуск агента в подключённом проекте:
 
-- Codex спрашивает, доверять ли проекту, и один раз просит одобрить хуки: команда `/hooks`. Без доверия проекту хуки из `.codex/` не загружаются.
+- Codex спрашивает, доверять ли проекту, и один раз просит одобрить хуки: команда `/hooks`. Без доверия проекту хуки из `.codex/` не загружаются. Изменилась команда хука (например, после `attach` в Windows) - одобрение нужно снова.
 - Cursor выполняет хуки из файлов Claude Code, когда включена настройка "Include Third-Party Plugins, Skills, and Other Configs" (по умолчанию включена).
 
 ### Контейнер (devcontainer)
@@ -93,7 +108,7 @@ workbench detach    # отключить; сама база остаётся
 | Скиллы в общем для агентов формате | `.agents/skills/` (`wp-new`, `stages` - этапы работы, `close-session`, `distill` - разбор источника по слоям) |
 | Хуки: общее ядро и переходник в протоколе Claude Code (его понимает Codex, Cursor переводит сам) | `scripts/hooks.sh`, `scripts/guard.sh`, `adapters/claude/hooks/` |
 | Проверки для любого агента и человека | `.githooks/`: маркеры компании и секреты при сохранении, запрет перезаписи истории |
-| Установка, команда, подготовка и подключение | `install.sh`, `bin/workbench`, `scripts/setup.sh`, `scripts/attach.sh` |
+| Установка, команда, подготовка и подключение | `install.sh`, `bin/workbench` (для cmd и PowerShell - `bin/workbench.cmd`), `scripts/setup.sh`, `scripts/attach.sh` |
 | Тесты и проверка стиля | `tests/` (bats), `Makefile` |
 
 ## Работа
@@ -132,12 +147,11 @@ workbench detach    # отключить; сама база остаётся
 
 ## Ограничения
 
-- Импорт файлов по ссылке есть только у Claude Code. Codex и Cursor получают указатель на `AGENTS.md` и `memory/MEMORY.md` и читают их сами в начале сессии.
+- Импорт файлов по ссылке есть только у Claude Code. Codex и Cursor получают указатель на `AGENTS.md` и читают его сами, а индекс памяти `memory/MEMORY.md` приходит им целиком в сообщении начала сессии: проверка показала, что сам Codex эти файлы не читает. Codex заменяет сообщение хука длиннее 10 000 байт обрезанным с путём к полному тексту, поэтому индекс памяти стоит держать коротким.
 - Cursor в IDE по документации не передаёт агенту контекст из хука на сообщение, поэтому напоминание о допуске РП туда может не дойти (правило допуска всё равно есть в `AGENTS.md`). Причину отказа защиты Cursor показывает человеку, а не агенту.
 - Скиллы базы Cursor находит и в `.claude/skills`, и в `.agents/skills`.
-- Хуки Codex в Windows без Git Bash и WSL не проверялись.
 - Kimi и другие агенты читают `AGENTS.md`, но их переходники не сделаны.
-- Windows - только через Git Bash или WSL: весь код на sh.
+- Windows - только с Git for Windows: весь код на sh, а `workbench.cmd` и хуки Codex вызывают его `sh.exe`. Сторож разбирает команду по правилам sh. В Windows Codex выполняет команды в PowerShell: `git add -A` и `cd` сторож там ловит, а `Set-Location` и `Remove-Item -Recurse -Force` не узнаёт (удаление отклоняет защита самого Codex).
 - В WSL с git ниже 2.48 ссылка рабочей копии `.fpf` делается относительной вручную (как у подмодулей), `setup.sh` делает это сам.
 
 ## English

@@ -1,2 +1,4 @@
 # Scripts must keep LF line endings on every platform, Windows included: sh cannot run CRLF.
 * text=auto eol=lf
+# cmd.exe reads batch files with CRLF line endings.
+*.cmd text eol=crlf

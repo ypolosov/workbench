@@ -47,7 +47,7 @@ fi
 #    history on top of the template's, and that history must never be rewritten.
 git -C "$WB_DIR" config core.hooksPath .githooks
 git -C "$WB_DIR" config pull.rebase false
-chmod +x "$WB_DIR"/adapters/claude/hooks/*.sh "$WB_DIR"/.githooks/* "$WB_DIR"/scripts/*.sh "$WB_DIR"/bin/*
+chmod +x "$WB_DIR"/adapters/claude/hooks/*.sh "$WB_DIR"/.githooks/* "$WB_DIR"/scripts/*.sh "$WB_DIR"/bin/workbench
 
 # 3. Sessions opened in the base itself keep Claude Code auto-memory here and get the
 #    adapter's hooks and the personal overlay; Cursor runs the same hooks, and Codex gets

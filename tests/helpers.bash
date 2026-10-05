@@ -107,14 +107,30 @@ hook_from() {
   (cd "$2" && printf '%s' "$4" | CLAUDE_PROJECT_DIR="$2" sh -c "$cmd")
 }
 
+# on_windows: the tests run in Git Bash, MSYS2 or Cygwin on Windows.
+on_windows() {
+  case "$(uname -s)" in
+    MINGW* | MSYS* | CYGWIN*) return 0 ;;
+  esac
+  return 1
+}
+
 # codex_hook <project> <script> <json> [<folder>]: runs a hook command from the project's
-# Codex hooks the way Codex does: through a shell in the session folder (by default the
-# project), without CLAUDE_PROJECT_DIR.
+# Codex hooks the way Codex does, in the session folder (by default the project) and
+# without CLAUDE_PROJECT_DIR: through sh, and on Windows its commandWindows through
+# cmd.exe (a one-line batch file stands in for cmd.exe /C "<line>").
 codex_hook() {
-  local cmd
-  cmd="$(jq -r --arg s "$2" '[.. | objects | .command? | strings | select(contains("/" + $s))][0] // empty' "$1/.codex/hooks.json")"
+  local cmd key=command
+  if on_windows; then key=commandWindows; fi
+  cmd="$(jq -r --arg k "$key" --arg s "$2" '[.. | objects | .[$k]? | strings | select(contains("/" + $s))][0] // empty' "$1/.codex/hooks.json")"
   [ -n "$cmd" ] || return 90
-  (cd "${4:-$1}" && unset CLAUDE_PROJECT_DIR && printf '%s' "$3" | sh -c "$cmd")
+  if on_windows; then
+    printf '@%s\r\n' "$cmd" >"$BATS_TEST_TMPDIR/codex-hook.cmd"
+    (cd "${4:-$1}" && unset CLAUDE_PROJECT_DIR && printf '%s' "$3" |
+      MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' cmd /c "$(cygpath -w "$BATS_TEST_TMPDIR/codex-hook.cmd")")
+  else
+    (cd "${4:-$1}" && unset CLAUDE_PROJECT_DIR && printf '%s' "$3" | sh -c "$cmd")
+  fi
 }
 
 # cursor_hook <project> <script> <json>: runs a hook command from the project's Claude Code

@@ -15,17 +15,20 @@ wb_agent() {
 }
 
 # wb_files_line <agent>: how the agent gets the base's instructions and memory. Only
-# Claude Code imports files by reference; Codex and Cursor read them themselves.
+# Claude Code imports files by reference. Codex and Cursor read the instructions
+# themselves and get the memory index at the end of the session context: Codex was seen
+# skipping both files although its user-level AGENTS.md asked for them.
 wb_files_line() {
   wb_files="Инструкции workbench - ${WB_DIR}/AGENTS.md, личная память владельца - ${WB_DIR}/memory/MEMORY.md"
+  wb_own="подключать файлы по ссылке не умеет: прочитай их в начале сессии; индекс памяти - в конце этого сообщения"
   case $1 in
     codex)
-      wb_line="${wb_files}. Codex не подключает файлы по ссылке: прочитай оба файла в начале сессии."
+      wb_line="Инструкции workbench - ${WB_DIR}/AGENTS.md. Codex ${wb_own}."
       wb_codex_attached ||
         wb_line="${wb_line} Путей к базе в $(wb_codex_agents_md) нет: предложи владельцу подключить их командой workbench attach --user."
       ;;
     cursor)
-      wb_line="${wb_files}. Cursor не подключает файлы по ссылке: прочитай оба файла в начале сессии."
+      wb_line="Инструкции workbench - ${WB_DIR}/AGENTS.md. Cursor ${wb_own}."
       ;;
     *)
       if wb_user_attached; then
@@ -36,6 +39,17 @@ wb_files_line() {
       ;;
   esac
   printf '%s\n' "$wb_line"
+}
+
+# wb_memory_index <agent>: the owner's memory index for an agent without imports.
+wb_memory_index() {
+  case $1 in
+    codex | cursor) ;;
+    *) return 0 ;;
+  esac
+  [ -f "$WB_DIR/memory/MEMORY.md" ] || return 0
+  printf 'Индекс личной памяти владельца (%s, файлы памяти лежат рядом):\n' "$WB_DIR/memory/MEMORY.md"
+  cat "$WB_DIR/memory/MEMORY.md"
 }
 
 # wb_layers_line <folder>: where the layers of knowledge live for the session's project:
@@ -99,6 +113,7 @@ ${active}
 Правило допуска: свяжи задачу с РП и назови его ("Работаю по РП N: ..."). Подходящего нет - предложи принять, отложить, отклонить или вернуть (OPS.5); новый РП заводи скиллом wp-new только после явного "да".
 Граница: в \$WORKBENCH пишется только личное (РП, личные решения, факты о владельце). Код, данные и факты целевого проекта - только в сам проект или во встроенную память агента для этого проекта, никогда в \$WORKBENCH.
 EOF
+  wb_memory_index "$1"
 }
 
 # wb_prompt: the owner's message taken from the hook input on stdin. Line breaks that an

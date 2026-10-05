@@ -27,13 +27,16 @@ wb_fpf_edition() {
   sed -n "s/^$1=//p" "$WB_DIR/.fpf-edition" | tail -n 1
 }
 
-# wb_hooks_json <command> [<shell matcher>]: the hooks of the adapter in the format that
-# Claude Code and Codex share. In the command, %s stands for a hook script name, e.g.
-# '"$CLAUDE_PROJECT_DIR/.workbench/adapters/claude/hooks/%s"'. The matcher names the shell
-# tool: Bash for Claude Code, ^Bash$ for Codex, whose matchers are regular expressions.
+# wb_hooks_json <command> [<shell matcher> [<Windows command>]]: the hooks of the adapter
+# in the format that Claude Code and Codex share. In the commands, %s stands for a hook
+# script name, e.g. '"$CLAUDE_PROJECT_DIR/.workbench/adapters/claude/hooks/%s"'. The
+# matcher names the shell tool: Bash for Claude Code, ^Bash$ for Codex, whose matchers
+# are regular expressions. The Windows command goes to commandWindows, which Codex runs
+# on Windows instead of command.
 wb_hooks_json() {
-  jq -n --arg c "$1" --arg m "${2:-Bash}" '
-    def cmd(name): {type: "command", command: ($c | sub("%s"; name))};
+  jq -n --arg c "$1" --arg m "${2:-Bash}" --arg w "${3:-}" '
+    def cmd(name): {type: "command", command: ($c | sub("%s"; name))}
+      + (if $w == "" then {} else {commandWindows: ($w | sub("%s"; name))} end);
     {
       hooks: {
         SessionStart: [{hooks: [cmd("session-start.sh")]}],
@@ -50,6 +53,26 @@ wb_codex_hook_command() {
   # Expanded by the shell that runs each hook, not here.
   # shellcheck disable=SC2016
   printf 'WB_AGENT=codex sh "$(git rev-parse --show-toplevel)/%s/%%s"\n' "$1"
+}
+
+# wb_codex_windows_hook_command <sh.exe> <project> <adapter>: the Codex hook command on
+# Windows. Codex runs it through cmd.exe /C, not sh, so it names Git's sh.exe and the
+# project by absolute paths: no sh syntax, no git in the project (which can stop on
+# "dubious ownership"). Git's bin/sh.exe puts Git's own tools (git, sed, awk) first in
+# PATH; jq and the rest come from the environment Codex was started with.
+wb_codex_windows_hook_command() {
+  printf 'set "WB_AGENT=codex" && "%s" "%s/%s/%%s"\n' "$1" "$2" "$3"
+}
+
+# wb_git_sh: the Windows path of Git for Windows' bin/sh.exe, which sets up Git's PATH
+# itself; elsewhere (MSYS2, Cygwin) the sh in PATH.
+wb_git_sh() {
+  wb_root="$(cygpath -m /)"
+  if [ -f "${wb_root%/}/bin/sh.exe" ]; then
+    cygpath -w "${wb_root%/}/bin/sh.exe"
+  else
+    cygpath -w "$(command -v sh)"
+  fi
 }
 
 # Prints the JSON document $1 merged with the personal overlay, when there is one.

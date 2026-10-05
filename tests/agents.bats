@@ -51,12 +51,42 @@ codex_context() {
     and .hooks.PreToolUse[0].matcher == "^Bash$"' "$P1/.codex/hooks.json"
 }
 
-@test "Codex, запущенный из подпапки: начало сессии называет базу и просит прочитать её файлы" {
+@test "Codex, запущенный из подпапки: начало сессии называет базу и просит прочитать её инструкции" {
   ctx="$(codex_context "$P1/src")"
   [[ $ctx == *"\$WORKBENCH = $BASE"* ]]
   [[ $ctx == *"$BASE/AGENTS.md"* ]]
-  [[ $ctx == *"прочитай оба файла"* ]]
+  [[ $ctx == *"прочитай их в начале сессии"* ]]
   [[ $ctx == *"workbench attach --user"* ]]
+}
+
+@test "Codex: начало сессии несёт индекс личной памяти, читать его самому не нужно" {
+  ctx="$(codex_context "$P1")"
+  [[ $ctx == *"$BASE/memory/MEMORY.md"* ]]
+  [[ $ctx == *"$(cat "$BASE/memory/MEMORY.md")"* ]]
+}
+
+@test "хуки Codex в Linux и macOS - команды sh, без commandWindows" {
+  if on_windows; then skip "только Linux и macOS"; fi
+  jq -e '[.. | objects | select(has("commandWindows"))] | length == 0' "$P1/.codex/hooks.json"
+  jq -e '[.hooks.SessionStart[0].hooks[0].command | startswith("WB_AGENT=codex sh ")] | all' "$P1/.codex/hooks.json"
+}
+
+@test "хуки Codex в Windows: commandWindows запускает sh.exe Git по абсолютным путям, без git rev-parse" {
+  if ! on_windows; then skip "только Windows"; fi
+  dir="$(cygpath -m "$P1")"
+  for name in session-start.sh wp-gate-reminder.sh close-gate-reminder.sh destructive-guard.sh; do
+    line="$(jq -r --arg s "/$name" '[.. | objects | .commandWindows? | strings | select(endswith($s + "\""))][0] // empty' "$P1/.codex/hooks.json")"
+    [[ $line == "set \"WB_AGENT=codex\" && \""*"\\bin\\sh.exe\" \"$dir/.workbench/adapters/claude/hooks/$name\"" ]]
+    [[ $line != *rev-parse* ]]
+  done
+  sh_exe="${line#*&& \"}"
+  [ -f "$(cygpath -u "${sh_exe%%\"*}")" ]
+}
+
+@test "строка хука Codex для cmd.exe: переменная агента, sh.exe и путь к скрипту в кавычках" {
+  line="$(WB_DIR="$BASE" sh -c '. "$WB_DIR/scripts/paths.sh" && wb_codex_windows_hook_command "$1" "$2" "$3"' - \
+    'C:\Program Files\Git\bin\sh.exe' 'C:/Users/me/my project' .workbench/adapters/claude/hooks)"
+  [ "$line" = 'set "WB_AGENT=codex" && "C:\Program Files\Git\bin\sh.exe" "C:/Users/me/my project/.workbench/adapters/claude/hooks/%s"' ]
 }
 
 @test "Codex: напоминание о реестре РП и защита от git add -A" {
@@ -79,8 +109,15 @@ codex_context() {
   out="$(cursor_hook "$P1" session-start.sh "$(cursor_session_input "$P1")")"
   ctx="$(context_of "$out")"
   [[ $ctx == *"\$WORKBENCH = $BASE"* ]]
-  [[ $ctx == *"прочитай оба файла"* ]]
+  [[ $ctx == *"прочитай их в начале сессии"* ]]
+  [[ $ctx == *"$(cat "$BASE/memory/MEMORY.md")"* ]]
   [[ $ctx != *"Claude Code загружает"* ]]
+}
+
+@test "Claude Code получает память импортом: индекса в начале сессии нет" {
+  ctx="$(session_context "$P1")"
+  [[ $ctx == *"Claude Code загружает"* ]]
+  [[ $ctx != *"$(cat "$BASE/memory/MEMORY.md")"* ]]
 }
 
 @test "защита понимает и команду в формате Cursor" {
@@ -106,7 +143,7 @@ codex_context() {
   names_base_file "$CODEX_MD" AGENTS.md
   names_base_file "$CODEX_MD" memory/MEMORY.md
   ctx="$(codex_context "$P1")"
-  [[ $ctx == *"прочитай оба файла"* ]]
+  [[ $ctx == *"прочитай их в начале сессии"* ]]
   [[ $ctx != *"workbench attach --user"* ]]
 }
 
