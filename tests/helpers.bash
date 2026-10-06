@@ -126,8 +126,9 @@ codex_hook() {
   [ -n "$cmd" ] || return 90
   if on_windows; then
     printf '@%s\r\n' "$cmd" >"$BATS_TEST_TMPDIR/codex-hook.cmd"
+    # //c: Git Bash passes it as /c; no MSYS variables, which would reach git in the hook.
     (cd "${4:-$1}" && unset CLAUDE_PROJECT_DIR && printf '%s' "$3" |
-      MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' cmd /c "$(cygpath -w "$BATS_TEST_TMPDIR/codex-hook.cmd")")
+      cmd //c "$(cygpath -w "$BATS_TEST_TMPDIR/codex-hook.cmd")")
   else
     (cd "${4:-$1}" && unset CLAUDE_PROJECT_DIR && printf '%s' "$3" | sh -c "$cmd")
   fi

@@ -123,9 +123,9 @@ setup_file() {
   if ! on_windows; then skip "только Windows"; fi
   new_project "$SANDBOX/p-cmd"
   cmd_file="$(cygpath -w "$BASE/bin/workbench.cmd")"
-  run -0 env MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' cmd /c "$cmd_file" help
+  run -0 cmd //c "$cmd_file" help
   [[ $output == *"attach --user"* ]]
-  (cd "$SANDBOX/p-cmd" && MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' cmd /c "$cmd_file" attach)
+  (cd "$SANDBOX/p-cmd" && cmd //c "$cmd_file" attach)
   [ -f "$SANDBOX/p-cmd/.workbench/AGENTS.md" ]
-  run -1 env MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' cmd /c "$cmd_file" frobnicate
+  run -1 cmd //c "$cmd_file" frobnicate
 }

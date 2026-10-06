@@ -64,6 +64,16 @@ wb_codex_windows_hook_command() {
   printf 'set "WB_AGENT=codex" && "%s" "%s/%s/%%s"\n' "$1" "$2" "$3"
 }
 
+# wb_codex_hooks_json <root> <adapter>: the Codex hooks for hook scripts under the adapter
+# folder of the root; on Windows each also gets its commandWindows.
+wb_codex_hooks_json() {
+  wb_windows_command=""
+  if wb_windows; then
+    wb_windows_command="$(wb_codex_windows_hook_command "$(wb_git_sh)" "$(wb_native_path "$1")" "$2")"
+  fi
+  wb_hooks_json "$(wb_codex_hook_command "$2")" '^Bash$' "$wb_windows_command"
+}
+
 # wb_git_sh: the Windows path of Git for Windows' bin/sh.exe, which sets up Git's PATH
 # itself; elsewhere (MSYS2, Cygwin) the sh in PATH.
 wb_git_sh() {

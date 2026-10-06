@@ -65,9 +65,11 @@ fi
 wb_with_overlay "$settings" >"$local_settings.tmp"
 mv "$local_settings.tmp" "$local_settings"
 codex_hooks="$WB_DIR/.codex/hooks.json"
-settings="$(wb_hooks_json "$(wb_codex_hook_command adapters/claude/hooks)" '^Bash$')"
+settings="$(wb_codex_hooks_json "$WB_DIR" adapters/claude/hooks)"
 if [ -f "$codex_hooks" ]; then
-  settings="$(printf '%s' "$settings" | jq -s "$MERGE_JQ" "$codex_hooks" -)"
+  # The base's own hooks of an earlier run go first: a changed command would stay twice.
+  own="$(jq '.hooks |= with_entries(.value |= (map(.hooks |= map(select((.command // "") | contains("adapters/claude/hooks/") | not))) | map(select(.hooks | length > 0))))' "$codex_hooks")"
+  settings="$(printf '%s\n%s\n' "$own" "$settings" | jq -s "$MERGE_JQ")"
 fi
 printf '%s\n' "$settings" >"$codex_hooks.tmp"
 mv "$codex_hooks.tmp" "$codex_hooks"

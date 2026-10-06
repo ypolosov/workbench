@@ -26,6 +26,14 @@ setup_file() {
   [[ $(context_of "$out") == *"\$WORKBENCH = $BASE"* ]]
 }
 
+@test "повторный setup.sh не задваивает хуки Codex в самой базе, свой хук владельца остаётся" {
+  jq '.hooks.Stop = [{hooks: [{type: "command", command: "true"}]}]' "$BASE/.codex/hooks.json" >"$SANDBOX/codex-own.json"
+  cp "$SANDBOX/codex-own.json" "$BASE/.codex/hooks.json"
+  sh "$BASE/scripts/setup.sh" >/dev/null
+  jq -e '(.hooks.SessionStart | length) == 1 and (.hooks.SessionStart[0].hooks | length) == 1
+    and (.hooks.Stop[0].hooks[0].command == "true")' "$BASE/.codex/hooks.json"
+}
+
 @test "скиллы базы доступны" {
   for skill in "$BASE"/.agents/skills/*/; do
     [ -f "$BASE/.claude/skills/$(basename "$skill")/SKILL.md" ]

@@ -61,6 +61,7 @@ codex_context() {
 
 @test "Codex: начало сессии несёт индекс личной памяти, читать его самому не нужно" {
   ctx="$(codex_context "$P1")"
+  printf 'ctx: %q\n' "$ctx"
   [[ $ctx == *"$BASE/memory/MEMORY.md"* ]]
   [[ $ctx == *"$(cat "$BASE/memory/MEMORY.md")"* ]]
 }
@@ -76,6 +77,7 @@ codex_context() {
   dir="$(cygpath -m "$P1")"
   for name in session-start.sh wp-gate-reminder.sh close-gate-reminder.sh destructive-guard.sh; do
     line="$(jq -r --arg s "/$name" '[.. | objects | .commandWindows? | strings | select(endswith($s + "\""))][0] // empty' "$P1/.codex/hooks.json")"
+    printf 'line: %q\n' "$line"
     [[ $line == "set \"WB_AGENT=codex\" && \""*"\\bin\\sh.exe\" \"$dir/.workbench/adapters/claude/hooks/$name\"" ]]
     [[ $line != *rev-parse* ]]
   done
