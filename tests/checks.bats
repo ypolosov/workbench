@@ -39,3 +39,12 @@ setup_file() {
   ALLOW_FORCE_PUSH=1 git -C "$BASE" push -q --force origin HEAD:main
   [ "$(git -C "$PRIVATE" rev-parse main)" = "$(git -C "$BASE" rev-parse HEAD)" ]
 }
+
+@test "проверка в отдельной рабочей папке использует маркеры общей базы" {
+  other_tree="$SANDBOX/other worktree"
+  saved="$(git -C "$BASE" rev-parse HEAD)"
+  git -C "$BASE" worktree add -q --detach "$other_tree" "$saved"
+  run ! commit_note "$other_tree" "acme-internal must be blocked here too"
+  [ "$(git -C "$other_tree" rev-parse HEAD)" = "$saved" ]
+  git -C "$BASE" worktree remove "$other_tree"
+}

@@ -135,6 +135,8 @@ BOOT
   cp "$BASE/scripts/doctor.sh" "$SANDBOX/doctor-before"
   printf '# conflicting upstream edit\n' >>"$TPL/scripts/doctor.sh"
   printf '# pending tool change\n' >>"$TPL/scripts/install-tools.sh"
+  git -C "$TPL" add scripts/doctor.sh scripts/install-tools.sh
+  git -C "$TPL" commit -qm "published conflicting update"
   run -1 sh "$TPL/install.sh" --template "$TPL" --yes --dir "$BASE" \
     --bin-dir "$SANDBOX/bin" --no-launch
   cmp "$BASE/scripts/doctor.sh" "$SANDBOX/doctor-before"
@@ -167,14 +169,15 @@ BRIDGE
 
 @test "обновление программы не считает окончания строк Windows местной правкой" {
   eol_base="$SANDBOX/eol base"
-  git init -q "$eol_base"
-  mkdir -p "$eol_base/bin"
-  printf '*.cmd text eol=crlf\n' >"$eol_base/.gitattributes"
-  printf '@echo off\r\nrem original launcher\r\n' >"$eol_base/bin/workbench.cmd"
-  git -C "$eol_base" add .gitattributes bin/workbench.cmd
-  git -C "$eol_base" commit -qm "old launcher"
+  eol_template="$SANDBOX/eol template"
+  git clone -q "$TPL" "$eol_template"
+  git clone -q "$eol_template" "$eol_base"
   git -C "$eol_base" diff --quiet HEAD -- bin/workbench.cmd
+  printf 'rem updated launcher\r\n' >>"$eol_template/bin/workbench.cmd"
+  git -C "$eol_template" add bin/workbench.cmd
+  git -C "$eol_template" commit -qm "published launcher update"
   # shellcheck disable=SC2016
-  run -0 sh -c 'WB_DIR=$1; . "$2/scripts/upgrade.sh"; wb_upgrade_program "$2"' sh "$eol_base" "$TPL"
-  cmp "$eol_base/bin/workbench.cmd" "$TPL/bin/workbench.cmd"
+  run -0 sh -c 'WB_DIR=$1; . "$2/scripts/upgrade.sh"; wb_upgrade_program "$2"' sh "$eol_base" "$eol_template"
+  cmp "$eol_base/bin/workbench.cmd" "$eol_template/bin/workbench.cmd"
+  git -C "$eol_base" diff --quiet HEAD -- bin/workbench.cmd
 }

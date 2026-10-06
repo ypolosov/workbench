@@ -2,7 +2,7 @@
 # Blocks commits that carry company markers or obvious secrets into the personal core.
 # Markers live in .git/info/company-markers (local, untracked), one word or regex per line.
 set -u
-markers="$(git rev-parse --git-dir)/info/company-markers"
+markers="$(git rev-parse --git-common-dir)/info/company-markers"
 added="$(git diff --cached -U0 --no-color | grep '^+' | grep -v '^+++' || true)"
 [ -z "$added" ] && exit 0
 

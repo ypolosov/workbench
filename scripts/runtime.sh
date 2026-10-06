@@ -9,7 +9,7 @@ wb_runtime_install() {
   wb_tools_bin=${WORKBENCH_TOOLS_BIN:-$HOME/.cache/workbench/tools/bin}
   if wb_windows; then wb_tools_bin="$(cygpath -u "$wb_tools_bin")"; fi
   mkdir -p "$WB_DIR/.runtime"
-  wb_runtime_prefix="$WB_DIR/bin:$wb_bin_dir:$wb_tools_bin"
+  wb_runtime_prefix="$WB_DIR/bin:$wb_bin_dir:$wb_tools_bin:$HOME/bin"
   # A dependency found in a nonstandard directory must remain visible in new shells.
   wb_jq_bin="$(dirname "$(command -v jq)")"
   case ":$wb_runtime_prefix:" in *":$wb_jq_bin:"*) ;; *) wb_runtime_prefix="$wb_runtime_prefix:$wb_jq_bin" ;; esac
@@ -23,7 +23,8 @@ wb_runtime_install() {
   fi
   # Expanded by the future shell, not by the installer.
   # shellcheck disable=SC2016
-  printf 'export PATH=%s:"$PATH"\n' "$(wb_quote_sh "$wb_runtime_prefix")" >"$WB_DIR/.runtime/env.sh"
+  printf 'export PATH="$WB_DIR/bin:$HOME/.local/bin:$HOME/bin:$HOME/.cache/workbench/tools/bin":%s:"$PATH"\n' \
+    "$(wb_quote_sh "$wb_runtime_prefix")" >"$WB_DIR/.runtime/env.sh"
   if wb_windows; then
     printf 'export CLAUDE_CODE_GIT_BASH_PATH=%s\n' "$(wb_quote_sh "$CLAUDE_CODE_GIT_BASH_PATH")" >>"$WB_DIR/.runtime/env.sh"
   fi

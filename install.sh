@@ -319,18 +319,12 @@ existing_base() {
 }
 
 update_base() {
-  say "база уже есть в $DIR: обновляю"
-  if ! git -C "$DIR" diff --quiet || ! git -C "$DIR" diff --cached --quiet; then
-    say "сохраняю ваши локальные изменения; обновление файлов отложено"
-    return 0
-  fi
-  if git -C "$DIR" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
-    git -C "$DIR" pull -q --ff-only || die "не удалось обновить $DIR, разберись вручную"
-  fi
+  # Updating the program does not synchronize personal work with another machine.
+  say "использую вашу базу в $DIR"
 }
 
 # Creates the private repository from the template. The template stays a remote, so
-# its updates merge with: git pull template main
+# its program updates are imported by: workbench update
 create_from_template() {
   say "создаю личную базу из шаблона $TEMPLATE"
   git clone -q --origin template "$TEMPLATE" "$DIR"
@@ -460,12 +454,10 @@ main() {
     fi
     make_base
   fi
-  if [ "$CORE_ONLY" != 1 ]; then
-    WB_DIR=$DIR
-    # shellcheck source=/dev/null
-    . "$STAGING/source/scripts/upgrade.sh"
-    wb_upgrade_program "$STAGING/source" || die "программа не обновлена; ваши файлы сохранены"
-  fi
+  WB_DIR=$DIR
+  # shellcheck source=/dev/null
+  . "$STAGING/source/scripts/upgrade.sh"
+  wb_upgrade_program "$STAGING/source" || die "программа не обновлена; ваши файлы сохранены"
   sh "$DIR/scripts/setup.sh"
   install_command
   if [ "$CORE_ONLY" != 1 ]; then onboard; fi

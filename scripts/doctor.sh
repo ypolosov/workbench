@@ -69,6 +69,12 @@ else add_check fpf error 'Издание FPF не подготовлено'; fi
 if [ "$(git -C "$WB_DIR" config core.hooksPath 2>/dev/null || true)" = .githooks ]; then
   add_check git_hooks ok 'Проверки сохранения подключены'
 else add_check git_hooks error 'Проверки сохранения не подключены'; fi
+if [ -f "$WB_DIR/.runtime/program-version" ]; then
+  program_version="$(cat "$WB_DIR/.runtime/program-version")"
+  if git -C "$WB_DIR" merge-base --is-ancestor "$program_version" HEAD 2>/dev/null; then
+    add_check program_history ok 'Версия программы записана в истории шаблона и базы'
+  else add_check program_history error 'Обновление программы не записано в Git; выполните workbench update'; fi
+fi
 if command -v workbench >/dev/null 2>&1 || command -v workbench.cmd >/dev/null 2>&1; then
   add_check command ok 'Команда доступна'
 else add_check command error 'Команда недоступна; повторите установку'; fi

@@ -65,16 +65,18 @@ setup_file() {
 @test "запись с одной машины доходит до другой через удалённое хранилище" {
   commit_note "$BASE" "заметка с первой машины"
   git -C "$BASE" push -q origin HEAD
-  bootstrap "$BASE2" --bin-dir "$SANDBOX/bin2"
+  git -C "$BASE2" pull -q --ff-only origin main
   grep -qxF "заметка с первой машины" "$BASE2/inbox/fleeting-notes.md"
 }
 
-@test "обновление шаблона подтягивается в базу с её собственными записями командой из подсказки" {
+@test "команда update обновляет программу из шаблона с сохранением собственных записей базы" {
   commit_note "$BASE" "своя запись в базе"
-  printf 'новое в шаблоне\n' >"$TPL/TEMPLATE-NEWS.md"
-  git -C "$TPL" add TEMPLATE-NEWS.md
+  printf '\nНовое в программе.\n' >>"$TPL/README.md"
+  git -C "$TPL" add README.md
   git -C "$TPL" commit -qm "template: news"
-  git -C "$BASE" pull -q template main
-  [ -f "$BASE/TEMPLATE-NEWS.md" ]
+  run -0 wb "$BASE" update --template "$TPL" --yes --core-only
+  grep -q 'Новое в программе.' "$BASE/README.md"
+  git -C "$BASE" diff --quiet HEAD -- bin scripts adapters README.md
+  git -C "$BASE" merge-base --is-ancestor "$(git -C "$TPL" rev-parse HEAD)" HEAD
   grep -qxF "своя запись в базе" "$BASE/inbox/fleeting-notes.md"
 }
