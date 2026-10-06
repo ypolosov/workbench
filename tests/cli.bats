@@ -138,3 +138,13 @@ setup_file() {
   run -0 cmd //c "$cmd_file" setup
   run -1 cmd //c "$cmd_file" frobnicate
 }
+
+@test "workbench.cmd запускает только известные хуки Codex и передаёт явный отказ" {
+  if ! on_windows; then skip "только Windows"; fi
+  cmd_file="$(cygpath -w "$BASE/bin/workbench.cmd")"
+  run -1 cmd //c "$cmd_file" --hook unknown.sh
+  run -0 codex_hook "$BASE" destructive-guard.sh "$(bash_input "$BASE" "cd /tmp")"
+  printf '%s' "$output" | jq -e '.hookSpecificOutput.permissionDecision == "deny"'
+  [[ $output == *"BLOCKED:"* ]]
+  run -0 codex_hook "$BASE" destructive-guard.sh "$(bash_input "$BASE" "git status")"
+}

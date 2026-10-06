@@ -17,7 +17,7 @@ make_sandbox() {
   # shellcheck disable=SC2046
   unset $(git rev-parse --local-env-vars) \
     WORKBENCH_TEMPLATE WORKBENCH_REPO WORKBENCH_BASE WORKBENCH_NAME WORKBENCH_YES \
-    CLAUDE_CONFIG_DIR
+    CLAUDE_CONFIG_DIR CODEX_HOME WORKBENCH_PATH_STORE WORKBENCH_TOOLS_BIN
   SANDBOX="$(cd "$BATS_FILE_TMPDIR" && pwd -P)"
   export SANDBOX HOME="$SANDBOX/home"
   mkdir -p "$HOME"
@@ -82,7 +82,7 @@ new_project() {
 bootstrap() {
   local dir="$1"
   shift
-  (cd "$SANDBOX" && sh -s -- --template "$TPL" --dir "$dir" --bin-dir "$SANDBOX/bin" "$@" <"$TPL/install.sh")
+  (cd "$SANDBOX" && sh -s -- --core-only --template "$TPL" --dir "$dir" --bin-dir "$SANDBOX/bin" "$@" <"$TPL/install.sh")
 }
 
 # wb <dir> <command...>: the installed workbench command, run in the given folder.
@@ -117,18 +117,19 @@ on_windows() {
 
 # codex_hook <project> <script> <json> [<folder>]: runs a hook command from the project's
 # Codex hooks the way Codex does, in the session folder (by default the project) and
-# without CLAUDE_PROJECT_DIR: through sh, and on Windows its commandWindows through
-# cmd.exe (a one-line batch file stands in for cmd.exe /C "<line>").
+# without CLAUDE_PROJECT_DIR: through sh, and on Windows its commandWindows as one
+# native argv argument to cmd.exe /C. A batch file would hide argv quoting failures.
 codex_hook() {
-  local cmd key=command
+  local cmd hook_bin key=command
   if on_windows; then key=commandWindows; fi
-  cmd="$(jq -r --arg k "$key" --arg s "$2" '[.. | objects | .[$k]? | strings | select(contains("/" + $s))][0] // empty' "$1/.codex/hooks.json")"
+  cmd="$(jq -r --arg k "$key" --arg s "$2" '[.. | objects | .[$k]? | strings | select(contains($s))][0] // empty' "$1/.codex/hooks.json")"
   [ -n "$cmd" ] || return 90
   if on_windows; then
-    printf '@%s\r\n' "$cmd" >"$BATS_TEST_TMPDIR/codex-hook.cmd"
-    # //c: Git Bash passes it as /c; no MSYS variables, which would reach git in the hook.
+    hook_bin="$1/.workbench/bin"
+    [ -d "$hook_bin" ] || hook_bin="$1/bin"
+    # //c: Git Bash passes it as /c. The base's bin models the user's Windows PATH.
     (cd "${4:-$1}" && unset CLAUDE_PROJECT_DIR && printf '%s' "$3" |
-      cmd //c "$(cygpath -w "$BATS_TEST_TMPDIR/codex-hook.cmd")")
+      PATH="$hook_bin:$PATH" cmd //c "$cmd")
   else
     (cd "${4:-$1}" && unset CLAUDE_PROJECT_DIR && printf '%s' "$3" | sh -c "$cmd")
   fi

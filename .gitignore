@@ -5,3 +5,6 @@
 /.claude/skills
 /CLAUDE.local.md
 /.codex/
+
+# Machine-local tool paths and diagnostic reports.
+/.runtime/

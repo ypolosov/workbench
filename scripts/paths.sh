@@ -55,13 +55,11 @@ wb_codex_hook_command() {
   printf 'WB_AGENT=codex sh "$(git rev-parse --show-toplevel)/%s/%%s"\n' "$1"
 }
 
-# wb_codex_windows_hook_command <sh.exe> <project> <adapter>: the Codex hook command on
-# Windows. Codex runs it through cmd.exe /C, not sh, so it names Git's sh.exe and the
-# project by absolute paths: no sh syntax, no git in the project (which can stop on
-# "dubious ownership"). Git's bin/sh.exe puts Git's own tools (git, sed, awk) first in
-# PATH; jq and the rest come from the environment Codex was started with.
+# wb_codex_windows_hook_command: keep cmd.exe's native argv free of nested quotes.
+# workbench.cmd is in PATH and resolves Git and this base itself, even from a project
+# subfolder. It sets WB_AGENT and quotes paths inside the batch file, not in /C's argv.
 wb_codex_windows_hook_command() {
-  printf 'set "WB_AGENT=codex" && "%s" "%s/%s/%%s"\n' "$1" "$2" "$3"
+  printf 'workbench.cmd --hook %%s\n'
 }
 
 # wb_codex_hooks_json <root> <adapter>: the Codex hooks for hook scripts under the adapter
@@ -69,20 +67,9 @@ wb_codex_windows_hook_command() {
 wb_codex_hooks_json() {
   wb_windows_command=""
   if wb_windows; then
-    wb_windows_command="$(wb_codex_windows_hook_command "$(wb_git_sh)" "$(wb_native_path "$1")" "$2")"
+    wb_windows_command="$(wb_codex_windows_hook_command)"
   fi
   wb_hooks_json "$(wb_codex_hook_command "$2")" '^Bash$' "$wb_windows_command"
-}
-
-# wb_git_sh: the Windows path of Git for Windows' bin/sh.exe, which sets up Git's PATH
-# itself; elsewhere (MSYS2, Cygwin) the sh in PATH.
-wb_git_sh() {
-  wb_root="$(cygpath -m /)"
-  if [ -f "${wb_root%/}/bin/sh.exe" ]; then
-    cygpath -w "${wb_root%/}/bin/sh.exe"
-  else
-    cygpath -w "$(command -v sh)"
-  fi
 }
 
 # Prints the JSON document $1 merged with the personal overlay, when there is one.

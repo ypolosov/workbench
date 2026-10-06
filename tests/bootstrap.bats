@@ -41,7 +41,7 @@ setup_file() {
 
 @test "команда workbench установлена и знает, где база" {
   run -0 "$SANDBOX/bin/workbench" help
-  [[ $output == *"$BASE"* ]]
+  [[ $output == *"$(native "$BASE")"* ]]
   [[ $output == *attach* ]]
   [[ $output == *detach* ]]
 }

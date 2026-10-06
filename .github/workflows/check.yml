@@ -18,6 +18,10 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq bats shellcheck shfmt
       - name: make check
         run: make check
+      - name: Cold Linux bootstrap
+        env:
+          WORKBENCH_TEST_COLD_LINUX: '1'
+        run: bats --filter "загрузчик Linux" tests/onboarding.bats
 
   macos:
     if: ${{ !github.event.repository.private }}
@@ -45,3 +49,7 @@ jobs:
         run: npm install -g bats && jq --version
       - name: Tests
         run: bats tests
+      - name: Cold Windows bootstrap
+        env:
+          WORKBENCH_TEST_COLD_WINDOWS: '1'
+        run: bats --filter "загрузчик Windows" tests/onboarding.bats

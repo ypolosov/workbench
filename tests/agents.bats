@@ -71,30 +71,25 @@ codex_context() {
   jq -e '[.hooks.SessionStart[0].hooks[0].command | startswith("WB_AGENT=codex sh ")] | all' "$P1/.codex/hooks.json"
 }
 
-@test "хуки Codex в Windows: commandWindows запускает sh.exe Git по абсолютным путям, без git rev-parse" {
-  if ! on_windows; then skip "только Windows"; fi
-  dir="$(cygpath -m "$P1")"
-  for name in session-start.sh wp-gate-reminder.sh close-gate-reminder.sh destructive-guard.sh; do
-    line="$(jq -r --arg s "$name" '[.. | objects | .commandWindows? | strings | select(endswith("/" + $s + "\""))][0] // empty' "$P1/.codex/hooks.json" | tr -d '\r')"
-    printf 'line: %q\n' "$line"
-    [[ $line == "set \"WB_AGENT=codex\" && \""*"\\bin\\sh.exe\" \"$dir/.workbench/adapters/claude/hooks/$name\"" ]]
-    [[ $line != *rev-parse* ]]
-  done
-  sh_exe="${line#*&& \"}"
-  [ -f "$(cygpath -u "${sh_exe%%\"*}")" ]
-}
-
-@test "строка хука Codex для cmd.exe: переменная агента, sh.exe и путь к скрипту в кавычках" {
+@test "строка хука Codex для cmd.exe: запускатель без вложенных кавычек и путей с пробелами" {
   line="$(WB_DIR="$BASE" sh -c '. "$WB_DIR/scripts/paths.sh" && wb_codex_windows_hook_command "$1" "$2" "$3"' - \
     'C:\Program Files\Git\bin\sh.exe' 'C:/Users/me/my project' .workbench/adapters/claude/hooks)"
-  [ "$line" = 'set "WB_AGENT=codex" && "C:\Program Files\Git\bin\sh.exe" "C:/Users/me/my project/.workbench/adapters/claude/hooks/%s"' ]
+  [ "$line" = 'workbench.cmd --hook %s' ]
 }
 
 @test "Codex: напоминание о реестре РП и защита от git add -A" {
   out="$(codex_hook "$P1" wp-gate-reminder.sh "$(prompt_input "$P1" "сделай отчёт")")"
   [[ $(context_of "$out") == *WP-REGISTRY.md* ]]
-  run -2 codex_hook "$P1" destructive-guard.sh "$(bash_input "$P1" "git add -A")"
+  run -0 codex_hook "$P1" destructive-guard.sh "$(bash_input "$P1" "git add -A")"
+  printf '%s' "$output" | jq -e '.hookSpecificOutput.permissionDecision == "deny"'
+  [[ $output == *"BLOCKED:"* ]]
   run -0 codex_hook "$P1" destructive-guard.sh "$(bash_input "$P1" "git status")"
+}
+
+@test "Codex: неопределённый вход сторожа тоже даёт явный отказ" {
+  run -0 codex_hook "$P1" destructive-guard.sh '{}'
+  printf '%s' "$output" | jq -e '.hookSpecificOutput.permissionDecision == "deny"'
+  [[ $output == *"BLOCKED:"* ]]
 }
 
 @test "Cursor получает правило workbench: всегда в силе и ведёт к инструкциям и памяти базы" {

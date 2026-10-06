@@ -1,12 +1,24 @@
 #!/bin/sh
-# PreToolUse hook on shell commands, in the Claude Code hook protocol: Codex uses it as it
-# is, and Cursor runs it from the project's Claude Code settings. It takes the command out
-# of the hook input (tool_input.command; Cursor's own format has command) and hands it to
-# the guard's core, scripts/guard.sh: exit 2 with the reason on stderr refuses it.
+# PreToolUse adapter: the shared guard refuses a shell command with exit 2 and a reason.
+# Codex gets an explicit JSON denial: Windows CLI 0.160.1 ran the tool despite exit 2.
+# Claude Code and Cursor keep their stderr/exit-2 contract.
 set -u
 
-cmd_text="$(jq -er '(.tool_input.command // .command) | select(type == "string" and length > 0)' 2>/dev/null)" || {
-  echo "BLOCKED: не удалось разобрать вход хука или в нём нет команды; блокирую как неопределённо опасный запрос." >&2
+deny() {
+  if [ "${WB_AGENT:-}" = codex ]; then
+    jq -n --arg reason "$1" '{hookSpecificOutput: {
+      hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $reason
+    }}'
+    exit 0
+  fi
+  printf '%s\n' "$1" >&2
   exit 2
 }
-printf '%s\n' "$cmd_text" | sh "$(dirname "$0")/../../../scripts/guard.sh"
+
+cmd_text="$(jq -er '(.tool_input.command // .command) | select(type == "string" and length > 0)' 2>/dev/null)" ||
+  deny "BLOCKED: не удалось разобрать вход хука или в нём нет команды; блокирую как неопределённо опасный запрос."
+
+reason="$(printf '%s\n' "$cmd_text" | sh "$(dirname "$0")/../../../scripts/guard.sh" 2>&1)"
+result=$?
+[ "$result" -eq 0 ] || deny "${reason:-BLOCKED: не удалось проверить команду сторожем workbench.}"
+exit 0
