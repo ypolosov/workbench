@@ -1,6 +1,7 @@
 #!/bin/sh
 # Verified user-local dependencies. No Node, Python or Go runtime is required.
 wb_tools_bin=${WORKBENCH_TOOLS_BIN:-$HOME/.cache/workbench/tools/bin}
+if command -v cygpath >/dev/null 2>&1; then wb_tools_bin="$(cygpath -u "$wb_tools_bin")"; fi
 PATH="$wb_tools_bin:$PATH"
 export PATH
 wb_download() {
@@ -41,7 +42,8 @@ wb_tool_platform() {
 }
 wb_install_tool() {
   wb_tool_name=$1
-  if command -v "$wb_tool_name" >/dev/null 2>&1 && "$wb_tool_name" --version >/dev/null 2>&1; then return 0; fi
+  if command -v "$wb_tool_name" >/dev/null 2>&1 &&
+    sh -c '"$1" --version' sh "$wb_tool_name" >/dev/null 2>&1; then return 0; fi
   wb_tool_platform || return 1
   # Gum supplies an x64 Windows binary; Windows on ARM runs it through emulation.
   if [ "$wb_tool_name:$wb_os" = gum:windows ]; then wb_arch=amd64; fi
@@ -78,5 +80,5 @@ wb_install_tool() {
   chmod +x "$wb_tools_bin/$wb_tool_name$wb_tool_suffix"
   PATH="$wb_tools_bin:$PATH"
   export PATH
-  "$wb_tools_bin/$wb_tool_name$wb_tool_suffix" --version >/dev/null
+  sh -c '"$1" --version' sh "$wb_tool_name" >/dev/null
 }

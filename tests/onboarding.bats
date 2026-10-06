@@ -140,3 +140,27 @@ BOOT
   cmp "$BASE/scripts/doctor.sh" "$SANDBOX/doctor-before"
   run -1 grep -q '^# pending tool change$' "$BASE/scripts/install-tools.sh"
 }
+
+@test "каталог зависимостей в формате Windows работает в PATH оболочки sh" {
+  on_windows || skip "только Windows"
+  mkdir -p "$SANDBOX/cached tools"
+  printf '#!/bin/sh\nprintf "cached-jq\\n"\n' >"$SANDBOX/cached tools/jq"
+  chmod +x "$SANDBOX/cached tools/jq"
+  cat >"$SANDBOX/tools-probe.sh" <<'PROBE'
+#!/bin/sh
+WB_DIR="$(cygpath -u "$1")"
+. "$WB_DIR/scripts/install-tools.sh"
+command -v jq && wb_install_tool jq && sh -c 'jq --version'
+PROBE
+  cat >"$SANDBOX/tools-probe.ps1" <<'BRIDGE'
+param($GitSh,$Probe,$Template,$Tools)
+$env:WORKBENCH_TOOLS_BIN=$Tools
+$env:Path=$env:SystemRoot+'\System32;'+$env:SystemRoot+'\System32\WindowsPowerShell\v1.0'
+& $GitSh $Probe $Template
+exit $LASTEXITCODE
+BRIDGE
+  run -0 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(native "$SANDBOX/tools-probe.ps1")" \
+    -GitSh "$(cygpath -w "$(cygpath -m /)/bin/sh.exe")" -Probe "$(native "$SANDBOX/tools-probe.sh")" \
+    -Template "$(native "$TPL")" -Tools "$(cygpath -w "$SANDBOX/cached tools")"
+  [[ $output == *cached-jq* ]]
+}

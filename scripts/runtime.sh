@@ -7,6 +7,7 @@ wb_quote_sh() {
 wb_runtime_install() {
   wb_bin_dir=$1
   wb_tools_bin=${WORKBENCH_TOOLS_BIN:-$HOME/.cache/workbench/tools/bin}
+  if wb_windows; then wb_tools_bin="$(cygpath -u "$wb_tools_bin")"; fi
   mkdir -p "$WB_DIR/.runtime"
   wb_runtime_prefix="$WB_DIR/bin:$wb_bin_dir:$wb_tools_bin"
   # A dependency found in a nonstandard directory must remain visible in new shells.

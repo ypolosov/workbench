@@ -81,12 +81,12 @@ $wbArguments += '--no-launch'
 if ($CoreOnly) { $wbArguments += '--core-only' }
 & $env:WORKBENCH_GIT_SH @wbArguments
 $wbInstallExit = $LASTEXITCODE
+if ($wbInstallExit -ne 0) { throw ('workbench installation did not complete: '+$wbInstallExit) }
 if ($PathStore) {
     $env:Path = [IO.File]::ReadAllText($PathStore) + ';' + $env:Path
 } else {
     $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')
 }
-if ($wbInstallExit -ne 0) { throw ('workbench installation did not complete: '+$wbInstallExit) }
 if (-not $NoLaunch -and -not $CoreOnly -and -not [Console]::IsInputRedirected) {
     Write-Host 'workbench: opening the prepared terminal'
     $wbParent = Get-CimInstance Win32_Process -Filter ('ProcessId='+(Get-CimInstance Win32_Process -Filter ('ProcessId='+$PID)).ParentProcessId)
