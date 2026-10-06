@@ -5,8 +5,14 @@ WB_DIR="$(cd "$(dirname "$0")/.." && pwd -P)"
 template="${WORKBENCH_TEMPLATE:-$(git -C "$WB_DIR" remote get-url template)}"
 bin_dir="$HOME/.local/bin"
 if command -v jq >/dev/null 2>&1 && [ -f "$WB_DIR/.runtime/install.json" ]; then
-  bin_dir="$(jq -r '.binDir // empty' "$WB_DIR/.runtime/install.json")"
-  [ -n "$bin_dir" ] || bin_dir="$HOME/.local/bin"
+  saved_home="$(jq -r '.home // empty' "$WB_DIR/.runtime/install.json")"
+  saved_bin="$(jq -r '.binDir // empty' "$WB_DIR/.runtime/install.json")"
+  if [ "$saved_home" = "$HOME" ] && [ -n "$saved_bin" ]; then
+    bin_dir=$saved_bin
+  elif [ -z "$saved_home" ]; then
+    # Before home was recorded, only a path inside this home is safely reusable.
+    case "$saved_bin" in "$HOME"/*) bin_dir=$saved_bin ;; esac
+  fi
 fi
 assume_yes=0
 core_only=0

@@ -426,8 +426,8 @@ onboard() {
       fi
     fi
   fi
-  jq -n --arg base "$DIR" --arg bin "$BIN_DIR" --arg project "$PROJECT" \
-    '{base: $base, binDir: $bin, project: $project}' >"$DIR/.runtime/install.json"
+  jq -n --arg base "$DIR" --arg bin "$BIN_DIR" --arg project "$PROJECT" --arg home "$HOME" \
+    '{base: $base, binDir: $bin, project: $project, home: $home}' >"$DIR/.runtime/install.json"
   if [ -n "$PROJECT" ]; then
     sh "$DIR/scripts/doctor.sh" --project "$PROJECT" --report "$DIR/.runtime/doctor.json"
   else sh "$DIR/scripts/doctor.sh" --report "$DIR/.runtime/doctor.json"; fi

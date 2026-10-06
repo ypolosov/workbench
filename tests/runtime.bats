@@ -31,3 +31,14 @@ PROBE
   [ "${lines[0]}" = "$second_home/.local/bin/jq" ]
   [ "${lines[1]}" = "$second_home/bin/codex" ]
 }
+
+@test "update общей базы устанавливает команду в домашнюю папку текущего пользователя" {
+  base="$SANDBOX/shared base"
+  bootstrap "$base" --local
+  mkdir -p "$base/.runtime"
+  jq -n --arg bin "$HOME/.local/bin" '{binDir: $bin}' >"$base/.runtime/install.json"
+  second_home="$SANDBOX/second installer home"
+  mkdir -p "$second_home"
+  run -0 env HOME="$second_home" sh "$base/bin/workbench" update --template "$TPL" --yes --core-only
+  [ -f "$second_home/.local/bin/workbench" ]
+}
