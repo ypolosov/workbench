@@ -22,7 +22,9 @@ wb_upgrade_program() {
         printf 'workbench: локальный файл %s отличается от программы; сохранён без изменений\n' "$wb_upgrade_file" >&2
         return 1
       fi
-      if ! cmp -s "$wb_upgrade_target" "$wb_upgrade_stage/ancestor"; then
+      # Git compares the worktree with its attributes applied (notably CRLF in .cmd).
+      # A byte comparison with a normalized blob would invent a local edit.
+      if ! git -C "$WB_DIR" diff --quiet HEAD -- "$wb_upgrade_file"; then
         cp "$wb_upgrade_target" "$wb_upgrade_stage/new/$wb_upgrade_file"
         if ! git merge-file --quiet "$wb_upgrade_stage/new/$wb_upgrade_file" \
           "$wb_upgrade_stage/ancestor" "$wb_upgrade_source/$wb_upgrade_file"; then
