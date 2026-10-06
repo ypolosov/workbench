@@ -148,9 +148,15 @@ cursor_session_input() {
   jq -n --arg root "$1" '{hook_event_name: "sessionStart", cursor_version: "3.10.20", workspace_roots: [$root]}'
 }
 
-# context_of <hook output>: the additionalContext the hook returned.
+# context_of <hook output>: the additionalContext the hook returned. jq on Windows ends
+# its lines with CRLF; the text itself has none.
 context_of() {
-  printf '%s' "$1" | jq -r '.hookSpecificOutput.additionalContext // empty' 2>/dev/null || true
+  printf '%s' "$1" | jq -r '.hookSpecificOutput.additionalContext // empty' 2>/dev/null | tr -d '\r' || true
+}
+
+# native <path>: the path as the hooks name it to agents: C:/... on Windows.
+native() {
+  if on_windows; then cygpath -m "$1"; else printf '%s\n' "$1"; fi
 }
 
 session_input() {

@@ -20,7 +20,7 @@ setup_file() {
 @test "после смены издания начало сессии предупреждает и называет команду обновления" {
   ctx="$(session_context "$BASE")"
   [[ $ctx == *"ВНИМАНИЕ: закреплено издание ${FPF_NEWER:0:7}"* ]]
-  [[ $ctx == *"$BASE/scripts/setup.sh"* ]]
+  [[ $ctx == *"$(native "$BASE")/scripts/setup.sh"* ]]
 }
 
 @test "setup.sh переводит рабочую копию FPF на новое закреплённое издание" {

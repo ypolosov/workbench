@@ -40,7 +40,7 @@ curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh 
 
   Новые окна cmd, PowerShell и Git Bash увидят команду. `jq` тоже должен быть в PATH (например, `winget install jqlang.jq`).
 - Claude Code в Windows выполняет хуки через Git Bash, из какой бы оболочки его ни запустили, поэтому его хуки те же, что в Linux.
-- Codex в Windows выполняет хуки через `cmd.exe`, а не через sh. Поэтому `attach` в Windows пишет каждому хуку Codex ещё и `commandWindows`: абсолютный путь к `bin\sh.exe` Git (берётся при `attach`) и абсолютный путь к проекту. Переехал Git или проект - повтори `workbench attach`. После `attach` хуки Codex надо одобрить заново.
+- Codex в Windows выполняет хуки через `cmd.exe`, а не через sh. Поэтому `attach` в Windows пишет каждому хуку Codex ещё и `commandWindows`: абсолютный путь к `bin\sh.exe` Git (берётся при `attach`) и абсолютный путь к проекту. Переехал Git или проект - повтори `workbench attach`. После `attach` хуки Codex надо одобрить заново. Пути к базе в сообщениях хуков даются в виде `C:/...`: такой путь открывают и агенты в PowerShell.
 
 ## Подключение
 

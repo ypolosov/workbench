@@ -3,6 +3,10 @@
 # hook protocol reads the hook input, calls these functions and wraps the text the way its
 # agent expects it. Source paths.sh first.
 
+# The base as the agent reads paths: C:/... on Windows, where Git Bash says /c/... and an
+# agent outside Git Bash (Codex in PowerShell) cannot open that.
+wb_home="$(wb_native_path "$WB_DIR")"
+
 # wb_agent <hook input>: the agent that runs the hook. Cursor runs the hooks of Claude
 # Code's settings itself and says so in the input and the environment; the Codex hooks
 # name their agent in WB_AGENT; everything else is Claude Code.
@@ -19,22 +23,22 @@ wb_agent() {
 # themselves and get the memory index at the end of the session context: Codex was seen
 # skipping both files although its user-level AGENTS.md asked for them.
 wb_files_line() {
-  wb_files="Инструкции workbench - ${WB_DIR}/AGENTS.md, личная память владельца - ${WB_DIR}/memory/MEMORY.md"
+  wb_files="Инструкции workbench - ${wb_home}/AGENTS.md, личная память владельца - ${wb_home}/memory/MEMORY.md"
   wb_own="подключать файлы по ссылке не умеет: прочитай их в начале сессии; индекс памяти - в конце этого сообщения"
   case $1 in
     codex)
-      wb_line="Инструкции workbench - ${WB_DIR}/AGENTS.md. Codex ${wb_own}."
+      wb_line="Инструкции workbench - ${wb_home}/AGENTS.md. Codex ${wb_own}."
       wb_codex_attached ||
         wb_line="${wb_line} Путей к базе в $(wb_codex_agents_md) нет: предложи владельцу подключить их командой workbench attach --user."
       ;;
     cursor)
-      wb_line="Инструкции workbench - ${WB_DIR}/AGENTS.md. Cursor ${wb_own}."
+      wb_line="Инструкции workbench - ${wb_home}/AGENTS.md. Cursor ${wb_own}."
       ;;
     *)
       if wb_user_attached; then
         wb_line="${wb_files}; Claude Code загружает их из $(wb_user_claude_md)."
       else
-        wb_line="${wb_files}. В $(wb_user_claude_md) их нет: прочитай оба файла и предложи владельцу подключить их командой workbench attach --user (если команды нет в PATH: sh \"${WB_DIR}/bin/workbench\" attach --user)."
+        wb_line="${wb_files}. В $(wb_user_claude_md) их нет: прочитай оба файла и предложи владельцу подключить их командой workbench attach --user (если команды нет в PATH: sh \"${wb_home}/bin/workbench\" attach --user)."
       fi
       ;;
   esac
@@ -48,14 +52,14 @@ wb_memory_index() {
     *) return 0 ;;
   esac
   [ -f "$WB_DIR/memory/MEMORY.md" ] || return 0
-  printf 'Индекс личной памяти владельца (%s, файлы памяти лежат рядом):\n' "$WB_DIR/memory/MEMORY.md"
+  printf 'Индекс личной памяти владельца (%s, файлы памяти лежат рядом):\n' "$wb_home/memory/MEMORY.md"
   cat "$WB_DIR/memory/MEMORY.md"
 }
 
 # wb_layers_line <folder>: where the layers of knowledge live for the session's project:
 # the personal LPF and DPFs in the base, the project's in lpf/ and dpf/ of its git.
 wb_layers_line() {
-  wb_layers="Слои знаний (раздел 3 в AGENTS.md): личные LPF и DPF - ${WB_DIR}/lpf/ и ${WB_DIR}/dpf/"
+  wb_layers="Слои знаний (раздел 3 в AGENTS.md): личные LPF и DPF - ${wb_home}/lpf/ и ${wb_home}/dpf/"
   wb_root="$(git -C "$1" rev-parse --show-toplevel 2>/dev/null || true)"
   if [ -n "$wb_root" ] && [ "$(cd "$wb_root" && pwd -P)" != "$WB_DIR" ]; then
     wb_found=""
@@ -80,11 +84,11 @@ wb_layers_line() {
 wb_session_context() {
   pinned="$(wb_fpf_edition commit)"
   if fpf_rev="$(git -C "$FPF_DIR" rev-parse HEAD 2>/dev/null)"; then
-    fpf_line="\$FPF = ${FPF_DIR} (издание $(printf '%.7s' "$fpf_rev"))"
+    fpf_line="\$FPF = ${wb_home}/.fpf (издание $(printf '%.7s' "$fpf_rev"))"
     [ "$fpf_rev" = "$pinned" ] ||
-      fpf_line="${fpf_line}; ВНИМАНИЕ: закреплено издание $(printf '%.7s' "$pinned"), рабочую копию на него переводит sh ${WB_DIR}/scripts/setup.sh"
+      fpf_line="${fpf_line}; ВНИМАНИЕ: закреплено издание $(printf '%.7s' "$pinned"), рабочую копию на него переводит sh ${wb_home}/scripts/setup.sh"
   else
-    fpf_line="\$FPF не подготовлен: запусти ${WB_DIR}/scripts/setup.sh"
+    fpf_line="\$FPF не подготовлен: запусти ${wb_home}/scripts/setup.sh"
   fi
 
   sync_state="$(git -C "$WB_DIR" status -sb 2>/dev/null | head -n 1)"
@@ -103,7 +107,7 @@ wb_session_context() {
   cat <<EOF
 workbench подключён. Сегодня $(date '+%Y-%m-%d %A').
 Целевой проект: $2
-\$WORKBENCH = ${WB_DIR} (git: ${sync_state#\#\# })
+\$WORKBENCH = ${wb_home} (git: ${sync_state#\#\# })
 $(wb_files_line "$1")
 $(wb_layers_line "$2")
 ${fpf_line}
@@ -133,7 +137,7 @@ wb_prompt_answer() {
 }
 
 wb_wp_reminder() {
-  printf '%s\n' "РП: новую задачу свяжи с РП из ${WB_DIR}/docs/WP-REGISTRY.md (нет подходящего - принять, отложить, отклонить или вернуть, OPS.5). Продолжение того же РП - продолжай. Вопрос без изменения файлов РП не требует."
+  printf '%s\n' "РП: новую задачу свяжи с РП из ${wb_home}/docs/WP-REGISTRY.md (нет подходящего - принять, отложить, отклонить или вернуть, OPS.5). Продолжение того же РП - продолжай. Вопрос без изменения файлов РП не требует."
 }
 
 # wb_close_reminder <prompt>: the close instruction when the prompt asks to close the session.

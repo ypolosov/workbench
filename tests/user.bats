@@ -48,7 +48,7 @@ import_path() {
 
 @test "с блоком начало сессии не просит читать файлы базы вручную" {
   ctx="$(session_context "$P1")"
-  [[ $ctx == *"$BASE/AGENTS.md"* ]]
+  [[ $ctx == *"$(native "$BASE")/AGENTS.md"* ]]
   [[ $ctx != *"прочитай оба файла"* ]]
 }
 
@@ -73,8 +73,8 @@ import_path() {
 
 @test "без блока начало сессии просит прочитать файлы базы и называет команду" {
   ctx="$(session_context "$P1")"
-  [[ $ctx == *"$BASE/AGENTS.md"* ]]
-  [[ $ctx == *"$BASE/memory/MEMORY.md"* ]]
+  [[ $ctx == *"$(native "$BASE")/AGENTS.md"* ]]
+  [[ $ctx == *"$(native "$BASE")/memory/MEMORY.md"* ]]
   [[ $ctx == *"прочитай оба файла"* ]]
   [[ $ctx == *"workbench attach --user"* ]]
 }

@@ -17,13 +17,13 @@ setup_file() {
 
 @test "начало сессии в самой базе указывает на неё" {
   ctx="$(session_context "$BASE")"
-  [[ $ctx == *"\$WORKBENCH = $BASE"* ]]
+  [[ $ctx == *"\$WORKBENCH = $(native "$BASE")"* ]]
 }
 
 @test "Codex в самой базе получает хуки базы" {
   jq -e '.hooks.PreToolUse[0].matcher == "^Bash$"' "$BASE/.codex/hooks.json"
   out="$(codex_hook "$BASE" session-start.sh "$(session_input "$BASE")")"
-  [[ $(context_of "$out") == *"\$WORKBENCH = $BASE"* ]]
+  [[ $(context_of "$out") == *"\$WORKBENCH = $(native "$BASE")"* ]]
 }
 
 @test "повторный setup.sh не задваивает хуки Codex в самой базе, свой хук владельца остаётся" {

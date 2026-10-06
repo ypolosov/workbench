@@ -15,14 +15,14 @@ setup_file() {
 
 @test "начало сессии: пути к workbench и FPF, закреплённое издание" {
   ctx="$(session_context "$P1")"
-  [[ $ctx == *"\$WORKBENCH = $BASE"* ]]
-  [[ $ctx == *"\$FPF = $BASE/.fpf (издание ${FPF_PINNED:0:7})"* ]]
+  [[ $ctx == *"\$WORKBENCH = $(native "$BASE")"* ]]
+  [[ $ctx == *"\$FPF = $(native "$BASE")/.fpf (издание ${FPF_PINNED:0:7})"* ]]
 }
 
 @test "без инструкций базы на уровне пользователя начало сессии просит прочитать её файлы и называет команду" {
   ctx="$(session_context "$P1")"
-  [[ $ctx == *"$BASE/AGENTS.md"* ]]
-  [[ $ctx == *"$BASE/memory/MEMORY.md"* ]]
+  [[ $ctx == *"$(native "$BASE")/AGENTS.md"* ]]
+  [[ $ctx == *"$(native "$BASE")/memory/MEMORY.md"* ]]
   [[ $ctx == *"прочитай оба файла"* ]]
   [[ $ctx == *"workbench attach --user"* ]]
 }

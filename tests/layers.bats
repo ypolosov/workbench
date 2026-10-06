@@ -32,8 +32,8 @@ setup_file() {
 
 @test "начало сессии называет личные LPF и DPF в базе" {
   ctx="$(session_context "$P2")"
-  [[ $ctx == *"$BASE/lpf/"* ]]
-  [[ $ctx == *"$BASE/dpf/"* ]]
+  [[ $ctx == *"$(native "$BASE")/lpf/"* ]]
+  [[ $ctx == *"$(native "$BASE")/dpf/"* ]]
 }
 
 @test "у каждого скилла базы имя совпадает с папкой и есть описание: так их принимают Codex и Cursor" {

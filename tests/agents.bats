@@ -53,16 +53,15 @@ codex_context() {
 
 @test "Codex, запущенный из подпапки: начало сессии называет базу и просит прочитать её инструкции" {
   ctx="$(codex_context "$P1/src")"
-  [[ $ctx == *"\$WORKBENCH = $BASE"* ]]
-  [[ $ctx == *"$BASE/AGENTS.md"* ]]
+  [[ $ctx == *"\$WORKBENCH = $(native "$BASE")"* ]]
+  [[ $ctx == *"$(native "$BASE")/AGENTS.md"* ]]
   [[ $ctx == *"прочитай их в начале сессии"* ]]
   [[ $ctx == *"workbench attach --user"* ]]
 }
 
 @test "Codex: начало сессии несёт индекс личной памяти, читать его самому не нужно" {
   ctx="$(codex_context "$P1")"
-  printf 'ctx: %q\n' "$ctx"
-  [[ $ctx == *"$BASE/memory/MEMORY.md"* ]]
+  [[ $ctx == *"$(native "$BASE")/memory/MEMORY.md"* ]]
   [[ $ctx == *"$(cat "$BASE/memory/MEMORY.md")"* ]]
 }
 
@@ -76,7 +75,7 @@ codex_context() {
   if ! on_windows; then skip "только Windows"; fi
   dir="$(cygpath -m "$P1")"
   for name in session-start.sh wp-gate-reminder.sh close-gate-reminder.sh destructive-guard.sh; do
-    line="$(jq -r --arg s "/$name" '[.. | objects | .commandWindows? | strings | select(endswith($s + "\""))][0] // empty' "$P1/.codex/hooks.json")"
+    line="$(jq -r --arg s "$name" '[.. | objects | .commandWindows? | strings | select(endswith("/" + $s + "\""))][0] // empty' "$P1/.codex/hooks.json" | tr -d '\r')"
     printf 'line: %q\n' "$line"
     [[ $line == "set \"WB_AGENT=codex\" && \""*"\\bin\\sh.exe\" \"$dir/.workbench/adapters/claude/hooks/$name\"" ]]
     [[ $line != *rev-parse* ]]
@@ -110,7 +109,7 @@ codex_context() {
   wb "$SANDBOX" attach --user
   out="$(cursor_hook "$P1" session-start.sh "$(cursor_session_input "$P1")")"
   ctx="$(context_of "$out")"
-  [[ $ctx == *"\$WORKBENCH = $BASE"* ]]
+  [[ $ctx == *"\$WORKBENCH = $(native "$BASE")"* ]]
   [[ $ctx == *"прочитай их в начале сессии"* ]]
   [[ $ctx == *"$(cat "$BASE/memory/MEMORY.md")"* ]]
   [[ $ctx != *"Claude Code загружает"* ]]

@@ -21,7 +21,7 @@ setup_file() {
   [ "$(cd "$MOVED/.workbench" && pwd -P)" = "$BASE" ]
   skills_linked "$MOVED"
   ctx="$(session_context "$MOVED")"
-  [[ $ctx == *"\$WORKBENCH = $BASE"* ]]
+  [[ $ctx == *"\$WORKBENCH = $(native "$BASE")"* ]]
 }
 
 @test "база перенесена: установка с новым путём и повторное подключение всё чинят" {
