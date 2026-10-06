@@ -17,6 +17,14 @@ setup_file() {
   [[ $output == *detach* ]]
   [[ $output == *"attach --user"* ]]
   [[ $output == *"detach --user"* ]]
+  [[ $output == *"workbench setup"* ]]
+}
+
+@test "workbench setup заново готовит базу: локальные файлы агентов в самой базе" {
+  rm -f "$BASE/.codex/hooks.json"
+  run -0 "$SANDBOX/bin/workbench" setup
+  jq -e '.hooks.PreToolUse[0].matcher == "^Bash$"' "$BASE/.codex/hooks.json"
+  [ -z "$(git -C "$BASE" status --porcelain)" ]
 }
 
 @test "неизвестная команда - понятная ошибка" {
@@ -127,5 +135,6 @@ setup_file() {
   [[ $output == *"attach --user"* ]]
   (cd "$SANDBOX/p-cmd" && cmd //c "$cmd_file" attach)
   [ -f "$SANDBOX/p-cmd/.workbench/AGENTS.md" ]
+  run -0 cmd //c "$cmd_file" setup
   run -1 cmd //c "$cmd_file" frobnicate
 }

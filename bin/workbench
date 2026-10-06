@@ -15,6 +15,8 @@ workbench - личная база этой машины: $WB_DIR
   workbench attach [<проект>]   подключить хуки и скиллы базы к проекту для Claude Code, Codex
                                 и Cursor (по умолчанию - к текущему)
   workbench detach [<проект>]   отключить базу от проекта; сама база остаётся
+  workbench setup               заново подготовить базу: издание FPF, проверки git и файлы агентов
+                                в самой базе (после git pull или после переноса папки)
   workbench help                эта справка
 
 Синхронизация с другими машинами: git -C $WB_DIR pull, затем push.
@@ -27,6 +29,7 @@ command="${1:-help}"
 case $command in
   attach) exec sh "$WB_DIR/scripts/attach.sh" "$@" ;;
   detach) exec sh "$WB_DIR/scripts/attach.sh" --detach "$@" ;;
+  setup) exec sh "$WB_DIR/scripts/setup.sh" "$@" ;;
   help | -h | --help) usage ;;
   *)
     echo "workbench: неизвестная команда: $command (см. workbench help)" >&2

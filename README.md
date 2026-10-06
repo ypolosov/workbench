@@ -31,7 +31,7 @@ curl -fsSL https://raw.githubusercontent.com/ypolosov/workbench/main/install.sh 
 
 Обязательная зависимость - Git for Windows: весь код на sh и выполняется его `bin\sh.exe`. Установка - в Git Bash, а пользоваться командой и агентами можно из cmd, PowerShell и Git Bash:
 
-- `bin\workbench.cmd` в папке базы вызывает ту же команду через `sh.exe` Git. Чтобы `workbench` работала из любой папки, добавь папку `bin` базы в PATH пользователя, один раз, в PowerShell:
+- `bin\workbench.cmd` в папке базы вызывает ту же команду через `sh.exe` Git: `workbench attach`, `workbench setup` и остальные работают и из cmd и PowerShell. Чтобы `workbench` работала из любой папки, добавь папку `bin` базы в PATH пользователя, один раз, в PowerShell:
 
   ```powershell
   $p = [Environment]::GetEnvironmentVariable('Path', 'User')
@@ -121,7 +121,7 @@ workbench detach    # отключить; сама база остаётся
 
 ## Обновление и удаление
 
-- Обновить базу: `git -C <папка базы> pull` или ещё раз запустить установщик.
+- Обновить базу: `git -C <папка базы> pull`, затем `workbench setup` (или ещё раз запустить установщик).
 - Подтянуть обновления шаблона: `git -C <папка базы> pull template main`.
 - Удалить: `workbench detach` в каждом проекте и `workbench detach --user`, затем папку базы и команду `~/.local/bin/workbench`.
 
