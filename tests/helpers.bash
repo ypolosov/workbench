@@ -225,6 +225,16 @@ project_files() {
   (cd "$1" && find . -path ./.git -prune -o -path ./.workbench -prune -o -print) | LC_ALL=C sort
 }
 
+# off_keyboard <dir>: file:line of every line with a character outside the keyboard (ASCII
+# and Russian letters) in the files of the git tree in <dir>, untracked ones included.
+# Binary files such as images have no lines of text and are left out.
+off_keyboard() {
+  # A perl program, not shell text.
+  # shellcheck disable=SC2016
+  (cd "$1" && git ls-files -co --exclude-standard -z |
+    xargs -0 perl -CSD -ne 'BEGIN { @ARGV = grep { !-B } @ARGV; exit 0 unless @ARGV } chomp; s/\r$//; print "$ARGV:$.\n" if /[^\t\x20-\x7E\x{0400}-\x{04FF}]/; close ARGV if eof' 2>/dev/null)
+}
+
 # The exclude file is the original one plus the two lines that keep the clone out.
 exclude_restored() {
   { grep -vxF -e '# workbench clone: personal, never commit' -e '/.workbench/' "$1/.git/info/exclude" || true; } |
