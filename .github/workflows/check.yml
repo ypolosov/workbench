@@ -16,6 +16,14 @@ jobs:
       - uses: actions/checkout@v7
       - name: Tools
         run: sudo apt-get update -qq && sudo apt-get install -y -qq bats shellcheck shfmt
+      # The pinned FPF edition in .fpf, as in a base: tests/fpf.bats checks the IDs of the
+      # practice against it. Elsewhere that test is skipped.
+      - name: Pinned FPF edition
+        run: |
+          git init -q .fpf
+          git -C .fpf fetch -q --depth 1 --no-tags -- "$(sed -n 's/^url=//p' .fpf-edition | tail -n 1)" \
+            "$(sed -n 's/^commit=//p' .fpf-edition | tail -n 1)"
+          git -C .fpf checkout -q --detach FETCH_HEAD
       - name: make check
         run: make check
       - name: Cold Linux bootstrap
